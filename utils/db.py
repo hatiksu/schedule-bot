@@ -41,10 +41,12 @@ CREATE TABLE IF NOT EXISTS purchases (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER,
     product    TEXT,                 -- plan:month | theme:neon | donate:50 | grant:30 (выдал админ)
-    stars      INTEGER,
-    charge_id  TEXT,                 -- telegram_payment_charge_id (нужен для возврата)
+    stars      INTEGER,              -- сумма в валюте покупки: звёзды (XTR) или рубли (RUB)
+    charge_id  TEXT,                 -- telegram_payment_charge_id (нужен для возврата звёзд)
     created_at TEXT,
-    refunded   INTEGER NOT NULL DEFAULT 0
+    refunded   INTEGER NOT NULL DEFAULT 0,
+    currency   TEXT NOT NULL DEFAULT 'XTR',
+    provider_charge_id TEXT          -- id платежа в ЮKassa (для возврата рублей в личном кабинете)
 );
 CREATE TABLE IF NOT EXISTS owned_themes (user_id INTEGER, theme TEXT, PRIMARY KEY (user_id, theme));
 CREATE TABLE IF NOT EXISTS favorites (
@@ -162,6 +164,13 @@ class DB:
             ncols = {r["name"] for r in await cur.fetchall()}
         if "reminded" not in ncols:
             await self.conn.execute("ALTER TABLE notes ADD COLUMN reminded INTEGER NOT NULL DEFAULT 0")
+        # 💳 оплата в рублях через ЮKassa
+        async with self.conn.execute("PRAGMA table_info(purchases)") as cur:
+            pcols = {r["name"] for r in await cur.fetchall()}
+        if "currency" not in pcols:
+            await self.conn.execute("ALTER TABLE purchases ADD COLUMN currency TEXT NOT NULL DEFAULT 'XTR'")
+        if "provider_charge_id" not in pcols:
+            await self.conn.execute("ALTER TABLE purchases ADD COLUMN provider_charge_id TEXT")
         await self.conn.commit()
 
     async def _migrate_users(self) -> None:
@@ -679,24 +688,31 @@ class DB:
             "FROM users", (now_s, FOREVER, now_s)
         ) as cur:
             row = dict(await cur.fetchone())
+        # Выручка отдельно по валютам: звёзды (total/month) и рубли (total_rub/month_rub)
         async with self.conn.execute(
-            "SELECT COALESCE(SUM(stars), 0) AS total, COUNT(*) AS cnt, "
-            "COALESCE(SUM(CASE WHEN created_at >= ? THEN stars END), 0) AS month "
-            "FROM purchases WHERE refunded = 0 AND charge_id IS NOT NULL", (month_start,)
+            "SELECT COUNT(*) AS cnt, "
+            "COALESCE(SUM(CASE WHEN currency = 'XTR' THEN stars END), 0) AS total, "
+            "COALESCE(SUM(CASE WHEN currency = 'XTR' AND created_at >= ? THEN stars END), 0) AS month, "
+            "COALESCE(SUM(CASE WHEN currency = 'RUB' THEN stars END), 0) AS total_rub, "
+            "COALESCE(SUM(CASE WHEN currency = 'RUB' AND created_at >= ? THEN stars END), 0) AS month_rub "
+            "FROM purchases WHERE refunded = 0 AND charge_id IS NOT NULL", (month_start, month_start)
         ) as cur:
             row.update(dict(await cur.fetchone()))
         async with self.conn.execute(
-            "SELECT product, COUNT(*) AS c, SUM(stars) AS s FROM purchases WHERE refunded = 0 "
-            "AND charge_id IS NOT NULL GROUP BY product ORDER BY s DESC LIMIT 8"
+            "SELECT product, currency, COUNT(*) AS c, SUM(stars) AS s FROM purchases WHERE refunded = 0 "
+            "AND charge_id IS NOT NULL GROUP BY product, currency ORDER BY c DESC, s DESC LIMIT 8"
         ) as cur:
             row["by_product"] = [dict(r) for r in await cur.fetchall()]
         return {k: (v or 0) if k != "by_product" else v for k, v in row.items()}
 
     # покупки
-    async def add_purchase(self, uid: int, product: str, stars: int, charge_id: str | None) -> int:
+    async def add_purchase(self, uid: int, product: str, stars: int, charge_id: str | None,
+                           currency: str = "XTR", provider_charge_id: str | None = None) -> int:
+        """stars — сумма в валюте покупки: звёзды для XTR, рубли для RUB."""
         cur = await self.conn.execute(
-            "INSERT INTO purchases(user_id, product, stars, charge_id, created_at) VALUES (?, ?, ?, ?, ?)",
-            (uid, product, stars, charge_id, self._now()))
+            "INSERT INTO purchases(user_id, product, stars, charge_id, created_at, currency, provider_charge_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (uid, product, stars, charge_id, self._now(), currency, provider_charge_id))
         await self.conn.commit()
         return cur.lastrowid
 
@@ -971,7 +987,11 @@ class DB:
                    "WHERE registered_at >= ? GROUP BY d",
             "dau": "SELECT day AS d, COUNT(DISTINCT user_id) FROM events WHERE day >= ? GROUP BY d",
             "stars": "SELECT substr(created_at, 1, 10) AS d, SUM(stars) FROM purchases "
-                     "WHERE created_at >= ? AND refunded = 0 AND charge_id IS NOT NULL GROUP BY d",
+                     "WHERE created_at >= ? AND refunded = 0 AND charge_id IS NOT NULL AND currency = 'XTR' "
+                     "GROUP BY d",
+            "rub": "SELECT substr(created_at, 1, 10) AS d, SUM(stars) FROM purchases "
+                   "WHERE created_at >= ? AND refunded = 0 AND charge_id IS NOT NULL AND currency = 'RUB' "
+                   "GROUP BY d",
         }.items():
             async with self.conn.execute(sql, (since,)) as cur:
                 res[key] = {r[0]: r[1] for r in await cur.fetchall()}

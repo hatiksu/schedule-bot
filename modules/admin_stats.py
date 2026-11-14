@@ -76,15 +76,21 @@ async def cb_charts(c: CallbackQuery):
         cum.append(acc)
     dau = [s["dau"].get(k, 0) for k in keys]
     stars = [s["stars"].get(k, 0) for k in keys]
-    charts = await asyncio.gather(
+    rub = [s.get("rub", {}).get(k, 0) for k in keys]
+    jobs = [
         asyncio.to_thread(chart, "Пользователи", f"всего {cum[-1]} · за 30 дней +{sum(new)}", labels,
                           bars=new, line=cum, bar_name="новые за день", line_name="всего"),
         asyncio.to_thread(chart, "Активность", f"в среднем {sum(dau) / 30:.0f} человек в день", labels,
                           bars=dau, bar_color=(255, 154, 60), bar_name="активных за день"),
         asyncio.to_thread(chart, "Выручка", f"за 30 дней {sum(stars)} ⭐", labels,
                           bars=stars, bar_color=(255, 210, 63), bar_name="звёзд за день"),
-    )
-    names = ("users", "activity", "revenue")
+    ]
+    names = ["users", "activity", "revenue"]
+    if sum(rub):  # 💳 продажи через ЮKassa — отдельный график
+        jobs.append(asyncio.to_thread(chart, "Выручка в рублях", f"за 30 дней {sum(rub)} ₽", labels,
+                                      bars=rub, bar_color=(61, 220, 132), bar_name="₽ за день"))
+        names.append("revenue-rub")
+    charts = await asyncio.gather(*jobs)
     media = [InputMediaPhoto(media=BufferedInputFile(png, f"{nm}.png"),
                              caption="📈 <b>Графики за 30 дней</b>" if i == 0 else None)
              for i, (png, nm) in enumerate(zip(charts, names, strict=False))]

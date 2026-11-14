@@ -15,11 +15,11 @@ from PIL import Image
 
 from config import DATA_DIR
 
-from modules.shop import send_invoice
+from modules.shop import rub_enabled, send_invoice
 from utils import image
 from utils.core import btn, db, now, runtime
 from utils.formatting import study_day
-from utils.premium import (ACCENTS, BACKGROUNDS, EMOJI_SETS, PAYWALL_KB, STYLES, THEMES,
+from utils.premium import (ACCENTS, BACKGROUNDS, EMOJI_SETS, PAYWALL_KB, STYLES, THEMES, price_label,
                            can_use_theme, is_premium, paywall)
 from utils.themes import build
 
@@ -152,7 +152,7 @@ async def cb_themes(c: CallbackQuery):
         elif is_premium(user):
             tag = "Premium"
         else:
-            tag = f"{price} ⭐"
+            tag = price_label(f"theme:{tid}", rub_enabled())
         rows.append([btn(f"{emoji} {name} · {tag}", f"ap:th:{tid}")])
     rows.append(BACK)
     await show(c, "🖼 <b>Тема картинки-расписания</b>\n<blockquote>Нажми на тему — покажу превью "
@@ -175,7 +175,7 @@ async def cb_theme(c: CallbackQuery):
     if can_use_theme(user, tid, owned):
         rows = [[btn("✅ Включить эту тему", f"ap:set:{tid}")]]
     else:
-        rows = [[btn(f"⭐ Купить навсегда — {price} ⭐", f"ap:buy:{tid}")],
+        rows = [[btn(f"⭐ Купить навсегда — {price_label(f'theme:{tid}', rub_enabled())}", f"ap:buy:{tid}")],
                 [btn("⭐ Все темы в Premium", "pm:menu")]]
     rows.append([btn("◀️ К темам", "ap:themes")])
     await c.message.answer_photo(BufferedInputFile(png, f"{tid}.png"), caption=f"{emoji} <b>{name}</b>",
@@ -200,8 +200,7 @@ async def cb_buy_theme(c: CallbackQuery):
     if not price:
         await c.answer()
         return
-    await send_invoice(c.message, f"theme:{tid}", f"{emoji} Тема «{name}»",
-                       "Тема картинки-расписания — твоя навсегда.")
+    await send_invoice(c.message, f"theme:{tid}")
     await c.answer()
 
 

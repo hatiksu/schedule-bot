@@ -1,10 +1,13 @@
-"""⭐ Premium: витрина, оплата Telegram Stars, пробный период, промокоды, донаты.
+"""⭐ Premium: витрина, оплата Telegram Stars или картой/СБП через ЮKassa, пробный период, промокоды, донаты.
 
-Оплата — встроенная в Telegram (валюта XTR), без ИП и эквайринга.
+Звёзды (валюта XTR) — встроенная оплата Telegram, без ИП и эквайринга.
+Рубли (RUB) — Telegram Payments с провайдером ЮKassa: токен из @BotFather → Payments, без своего сервера.
+Если токена ЮKassa нет, бот работает как раньше — только звёзды.
 """
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import datetime, timedelta
 from html import escape
 
@@ -16,10 +19,11 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import (CallbackQuery, InlineKeyboardMarkup, LabeledPrice, Message,
                            PreCheckoutQuery)
 
-from config import ADMIN_IDS
+from config import ADMIN_IDS, YOOKASSA_RECEIPT, YOOKASSA_TOKEN, YOOKASSA_VAT_CODE
 from utils.core import ALL_BUTTONS, btn, db, log, now
-from utils.premium import (DONATES, FEATURES, FOREVER, PLANS, THEMES, TRIAL_DAYS, is_forever,
-                           is_premium, status_text)
+from utils.premium import (DONATES, FEATURES, FOREVER, PLANS, RUB, RUB_DONATES, STARS, THEMES, TRIAL_DAYS,
+                           fmt_price, is_forever, is_premium, price, price_label, product_title, receipt,
+                           status_text)
 
 router = Router(name="premium")
 
@@ -30,16 +34,12 @@ class PromoState(StatesGroup):
 
 def price_of(product: str) -> int | None:
     """Сколько звёзд стоит товар (для проверки перед оплатой)."""
-    kind, _, value = product.partition(":")
-    if kind == "plan" and value in PLANS:
-        return PLANS[value][1]
-    if kind == "theme" and value in THEMES and THEMES[value][2] > 0:
-        return THEMES[value][2]
-    if kind == "gift" and value in PLANS:
-        return PLANS[value][1]
-    if kind == "donate" and value.isdigit() and int(value) in DONATES:
-        return int(value)
-    return None
+    return price(product, STARS)
+
+
+def rub_enabled() -> bool:
+    """Подключена ли оплата картой через ЮKassa."""
+    return bool(YOOKASSA_TOKEN)
 
 
 def _until_human(until: str) -> str:
@@ -62,13 +62,14 @@ async def menu_view(uid: int) -> tuple[str, InlineKeyboardMarkup]:
     if not user.get("trial_used") and not user.get("premium_until"):
         rows.append([btn(f"🎁 Попробовать {TRIAL_DAYS} дня бесплатно", "pm:trial")])
     if not is_forever(user):
-        month, year, forever = PLANS["month"], PLANS["year"], PLANS["forever"]
+        month, year = PLANS["month"], PLANS["year"]
         save = round(100 - year[1] / (month[1] * 12) * 100)
         verb = "Продлить" if active else "Купить"
+        rub = rub_enabled()
         rows += [
-            [btn(f"{verb} на месяц — {month[1]} ⭐", "pm:buy:month")],
-            [btn(f"{verb} на год — {year[1]} ⭐ (−{save}%)", "pm:buy:year")],
-            [btn(f"👑 Навсегда — {forever[1]} ⭐", "pm:buy:forever")],
+            [btn(f"{verb} на месяц — {price_label('plan:month', rub)}", "pm:buy:month")],
+            [btn(f"{verb} на год — {price_label('plan:year', rub)} (−{save}%)", "pm:buy:year")],
+            [btn(f"👑 Навсегда — {price_label('plan:forever', rub)}", "pm:buy:forever")],
         ]
     rows += [
         [btn("🎨 Темы по отдельности", "ap:themes"), btn("🎁 Подарить другу", "gf:menu")],
@@ -123,15 +124,52 @@ def _after_kb() -> InlineKeyboardMarkup:
 
 
 # ---------- оплата ----------
-async def send_invoice(message: Message, product: str, title: str, description: str) -> None:
-    price = price_of(product)
-    await message.answer_invoice(
-        title=title,
-        description=description,
-        payload=product,
-        currency="XTR",                       # Telegram Stars
-        prices=[LabeledPrice(label=title, amount=price)],
-    )
+async def send_invoice(message: Message, product: str, currency: str | None = None) -> None:
+    """Счёт на товар. Без валюты и с подключённой ЮKassa — сначала спрашиваем способ оплаты."""
+    if currency is None:
+        if rub_enabled() and price(product, RUB):
+            await ask_method(message, product)
+            return
+        currency = STARS
+    amount = price(product, currency)
+    if amount is None:
+        await message.answer("Этот товар сейчас нельзя купить таким способом 🙏")
+        return
+    title, description = product_title(product)
+    if currency == STARS:
+        await message.answer_invoice(title=title, description=description, payload=product, currency=STARS,
+                                     prices=[LabeledPrice(label=title, amount=amount)])
+        return
+    # ЮKassa: сумма в копейках; чек — если продавец работает с онлайн-кассой
+    extra = {}
+    if YOOKASSA_RECEIPT:
+        extra = {"need_email": True, "send_email_to_provider": True,
+                 "provider_data": json.dumps(receipt(product, amount, YOOKASSA_VAT_CODE), ensure_ascii=False)}
+    await message.answer_invoice(title=title, description=description, payload=product, currency=RUB,
+                                 provider_token=YOOKASSA_TOKEN,
+                                 prices=[LabeledPrice(label=title, amount=amount * 100)], **extra)
+
+
+async def ask_method(message: Message, product: str) -> None:
+    title, _ = product_title(product)
+    stars, rubles = price(product, STARS), price(product, RUB)
+    rows = []
+    if stars:
+        rows.append([btn(f"⭐ Звёздами — {fmt_price(stars)}", f"pay:xtr:{product}")])
+    rows.append([btn(f"💳 Картой или СБП — {fmt_price(rubles, RUB)}", f"pay:rub:{product}")])
+    await message.answer(f"<b>{title}</b>\n<blockquote>Как удобнее оплатить?</blockquote>",
+                         reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+
+@router.callback_query(F.data.startswith("pay:"))
+async def cb_pay(c: CallbackQuery):
+    _, method, product = c.data.split(":", 2)
+    currency = RUB if method == "rub" else STARS
+    if currency == RUB and not rub_enabled():
+        await c.answer("Оплата картой сейчас недоступна — можно звёздами ⭐", show_alert=True)
+        return
+    await send_invoice(c.message, product, currency)
+    await c.answer()
 
 
 @router.callback_query(F.data.startswith("pm:buy:"))
@@ -140,10 +178,7 @@ async def cb_buy(c: CallbackQuery):
     if plan not in PLANS:
         await c.answer()
         return
-    title, stars, days = PLANS[plan]
-    period = "навсегда" if days is None else ("на месяц" if days == 30 else "на год")
-    await send_invoice(c.message, f"plan:{plan}", title,
-                       f"Все функции Premium {period}: темы, напоминания, избранное, рассылки и не только.")
+    await send_invoice(c.message, f"plan:{plan}")
     await c.answer()
 
 
@@ -157,6 +192,9 @@ async def cb_donate(c: CallbackQuery):
             row = []
     if row:
         rows.append(row)
+    if rub_enabled():
+        rows.append([btn(f"💳 {n} ₽", f"pm:donr:{n}") for n in RUB_DONATES[:3]])
+        rows.append([btn(f"💳 {n} ₽", f"pm:donr:{n}") for n in RUB_DONATES[3:]])
     rows.append([btn("◀️ Назад", "pm:menu")])
     await c.message.edit_text(
         "💝 <b>Поддержать бота</b>\n<blockquote>Бот бесплатный и работает на энтузиазме. "
@@ -168,14 +206,30 @@ async def cb_donate(c: CallbackQuery):
 @router.callback_query(F.data.startswith("pm:don:"))
 async def cb_donate_pay(c: CallbackQuery):
     n = c.data.split(":")[2]
-    await send_invoice(c.message, f"donate:{n}", f"💝 Поддержка бота · {n} ⭐", "Спасибо, что помогаешь боту жить!")
+    await send_invoice(c.message, f"donate:{n}", STARS)
     await c.answer()
+
+
+@router.callback_query(F.data.startswith("pm:donr:"))
+async def cb_donate_rub(c: CallbackQuery):
+    await send_invoice(c.message, f"donate:{c.data.split(':')[2]}", RUB)
+    await c.answer()
+
+
+def expected_total(product: str, currency: str) -> int | None:
+    """Сколько должен заплатить пользователь в единицах Telegram: звёзды или копейки."""
+    if currency == RUB and not rub_enabled():
+        return None
+    amount = price(product, currency) if currency in (STARS, RUB) else None
+    if amount is None:
+        return None
+    return amount * 100 if currency == RUB else amount
 
 
 @router.pre_checkout_query()
 async def pre_checkout(q: PreCheckoutQuery):
-    expected = price_of(q.invoice_payload)
-    if expected is None or q.total_amount != expected or q.currency != "XTR":
+    expected = expected_total(q.invoice_payload, q.currency)
+    if expected is None or q.total_amount != expected:
         await q.answer(ok=False, error_message="Цена изменилась — открой меню Premium заново 🙏")
         return
     await q.answer(ok=True)
@@ -199,7 +253,10 @@ async def apply_purchase(uid: int, product: str) -> str:
 async def got_payment(m: Message):
     sp = m.successful_payment
     product = sp.invoice_payload
-    await db.add_purchase(m.from_user.id, product, sp.total_amount, sp.telegram_payment_charge_id)
+    currency = RUB if sp.currency == RUB else STARS
+    amount = sp.total_amount // 100 if currency == RUB else sp.total_amount
+    await db.add_purchase(m.from_user.id, product, amount, sp.telegram_payment_charge_id,
+                          currency=currency, provider_charge_id=sp.provider_payment_charge_id or None)
     if product.startswith("gift:"):
         from modules.gifts import after_purchase
         await after_purchase(m, product.split(":")[1])
@@ -214,7 +271,7 @@ async def got_payment(m: Message):
     uname = f" @{escape(user['username'])}" if user.get("username") else ""
     for admin_id in ADMIN_IDS:
         try:
-            await m.bot.send_message(admin_id, f"💰 <b>+{sp.total_amount} ⭐</b> · {escape(product)}\n"
+            await m.bot.send_message(admin_id, f"💰 <b>+{fmt_price(amount, currency)}</b> · {escape(product)}\n"
                                                f"от {who}{uname} · <code>{m.from_user.id}</code>",
                                      disable_notification=True)
         except TelegramAPIError:

@@ -1,4 +1,4 @@
-"""🎁 Подарить Premium: покупаешь звёздами — получаешь ссылку-подарок и отправляешь кому угодно."""
+"""🎁 Подарить Premium: покупаешь звёздами или картой — получаешь ссылку-подарок и отправляешь кому угодно."""
 from __future__ import annotations
 
 import secrets
@@ -11,7 +11,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMar
 
 from modules.appearance import show
 from utils.core import btn, db, runtime
-from utils.premium import PLANS, status_text
+from utils.premium import PLANS, price_label, status_text
 
 router = Router(name="gifts")
 
@@ -30,7 +30,9 @@ async def cb_menu(c: CallbackQuery):
             who = f"✅ получил {escape(g['full_name'] or 'друг')}" if g["redeemed_by"] else "⏳ ещё не открыт"
             lines.append(f"{PLANS[g['plan']][0]} · {who}")
         mine = "\n\n<b>Твои подарки</b>\n<blockquote>" + "\n".join(lines) + "</blockquote>"
-    rows = [[btn(f"🎁 {PLANS[p][0].split(' ', 1)[1]} — {PLANS[p][1]} ⭐", f"gf:buy:{p}")] for p in PLANS]
+    from modules.shop import rub_enabled
+    rows = [[btn(f"🎁 {PLANS[p][0].split(' ', 1)[1]} — {price_label(f'gift:{p}', rub_enabled())}", f"gf:buy:{p}")]
+            for p in PLANS]
     rows.append([btn("◀️ К Premium", "pm:menu")])
     await show(c, "🎁 <b>Подарить Premium</b>\n<blockquote>После оплаты пришлю ссылку-подарок — "
                   "отправь её другу, старосте, одногруппнику. Открыть её может любой, даже кто ещё "
@@ -46,9 +48,7 @@ async def cb_buy(c: CallbackQuery):
     if plan not in PLANS:
         await c.answer()
         return
-    title = PLANS[plan][0].replace("⭐ ", "").replace("👑 ", "")
-    await send_invoice(c.message, f"gift:{plan}", f"🎁 Подарок: {title}",
-                       "После оплаты получишь ссылку-подарок для друга.")
+    await send_invoice(c.message, f"gift:{plan}")
     await c.answer()
 
 

@@ -1,4 +1,4 @@
-"""⭐ Админка Premium: продажи и выручка, возврат звёзд, промокоды, выдача Premium вручную."""
+"""⭐ Админка Premium: продажи и выручка (звёзды и рубли), возвраты, промокоды, выдача Premium вручную."""
 from __future__ import annotations
 
 import re
@@ -13,7 +13,7 @@ from aiogram.types import CallbackQuery, InlineKeyboardMarkup, Message
 from modules.appearance import show
 from utils.core import btn, db, now
 from utils.filters import IsAdmin
-from utils.premium import PLANS, THEMES, status_text
+from utils.premium import PLANS, RUB, THEMES, fmt_price, status_text
 
 router = Router(name="admin_premium")
 router.message.filter(IsAdmin())
@@ -47,15 +47,18 @@ async def cb_menu(c: CallbackQuery, state: FSMContext):
     await state.clear()
     n = now()
     s = await db.premium_stats(n.strftime("%Y-%m-%d %H:%M:%S"), n.strftime("%Y-%m-01 00:00:00"))
-    top = "\n".join(f"{product_name(r['product'])} — {r['c']} шт · <b>{r['s']} ⭐</b>"
+    top = "\n".join(f"{product_name(r['product'])} — {r['c']} шт · <b>{fmt_price(r['s'], r['currency'])}</b>"
                     for r in s["by_product"]) or "продаж пока нет"
+    rub = f" + <b>{s['month_rub']} ₽</b>" if s["total_rub"] else ""
+    rub_total = f" + <b>{s['total_rub']} ₽</b>" if s["total_rub"] else ""
     await show(c,
                "⭐ <b>Premium и продажи</b>\n\n<blockquote>"
                f"👑 Активных Premium: <b>{s['active']}</b> (навсегда: {s['forever']}, на пробе: {s['trials']})\n\n"
-               f"💰 Выручка за месяц: <b>{s['month']} ⭐</b>\n"
-               f"💰 Всего: <b>{s['total']} ⭐</b> · покупок: {s['cnt']}</blockquote>\n"
+               f"💰 Выручка за месяц: <b>{s['month']} ⭐</b>{rub}\n"
+               f"💰 Всего: <b>{s['total']} ⭐</b>{rub_total} · покупок: {s['cnt']}</blockquote>\n"
                f"<b>Что покупают</b>\n<blockquote>{top}</blockquote>\n\n"
-               "<i>Звёзды выводятся через @BotFather → бот → Monetization (Fragment).</i>",
+               "<i>Звёзды выводятся через @BotFather → бот → Monetization (Fragment), "
+               "рубли приходят на счёт в ЮKassa.</i>",
                InlineKeyboardMarkup(inline_keyboard=[
                    [btn("🧾 Последние покупки", "pa:sales"), btn("🎟 Промокоды", "pa:promos")],
                    [btn("◀️ В админку", "adm:home")]]))
@@ -71,12 +74,12 @@ async def cb_sales(c: CallbackQuery):
         who = escape(p["full_name"] or str(p["user_id"]))
         mark = " · ↩️ возврат" if p["refunded"] else ""
         lines.append(f"#{p['id']} · {p['created_at'][5:16]} · {who} · {product_name(p['product'])} · "
-                     f"<b>{p['stars']} ⭐</b>{mark}")
+                     f"<b>{fmt_price(p['stars'], p.get('currency') or 'XTR')}</b>{mark}")
         if p["charge_id"] and not p["refunded"]:
             rows.append(btn(f"↩️ #{p['id']}", f"pa:ref:{p['id']}"))
     kb = [rows[i:i + 4] for i in range(0, len(rows), 4)] + [BACK]
     await show(c, "🧾 <b>Последние покупки</b>\n<blockquote>" + ("\n".join(lines) or "пока пусто") +
-               "</blockquote>\n\n↩️ — вернуть звёзды (и забрать купленное)",
+               "</blockquote>\n\n↩️ — вернуть оплату (и забрать купленное)",
                InlineKeyboardMarkup(inline_keyboard=kb))
     await c.answer()
 
@@ -87,8 +90,16 @@ async def cb_refund_ask(c: CallbackQuery):
     if not p:
         await c.answer("Не найдено", show_alert=True)
         return
-    await show(c, f"↩️ Вернуть <b>{p['stars']} ⭐</b> за «{product_name(p['product'])}» (#{p['id']})?\n"
-                  "<blockquote>Звёзды вернутся покупателю, купленное заберу.</blockquote>",
+    amount = fmt_price(p["stars"], p.get("currency") or "XTR")
+    if p.get("currency") == RUB:
+        # Рубли Telegram вернуть не может — возврат делается в личном кабинете ЮKassa
+        note = ("Сначала верни деньги в личном кабинете ЮKassa → Платежи"
+                + (f" (платёж <code>{escape(p['provider_charge_id'])}</code>)" if p.get("provider_charge_id") else "")
+                + ", потом нажми «Да» — я заберу купленное и напишу покупателю.")
+    else:
+        note = "Звёзды вернутся покупателю, купленное заберу."
+    await show(c, f"↩️ Вернуть <b>{amount}</b> за «{product_name(p['product'])}» (#{p['id']})?\n"
+                  f"<blockquote>{note}</blockquote>",
                InlineKeyboardMarkup(inline_keyboard=[[btn("✅ Да, вернуть", f"pa:rr:{p['id']}")],
                                                      [btn("◀️ Назад", "pa:sales")]]))
     await c.answer()
@@ -100,11 +111,13 @@ async def cb_refund(c: CallbackQuery):
     if not p or p["refunded"] or not p["charge_id"]:
         await c.answer("Возврат уже сделан или невозможен", show_alert=True)
         return
-    try:
-        await c.bot.refund_star_payment(user_id=p["user_id"], telegram_payment_charge_id=p["charge_id"])
-    except TelegramAPIError as e:
-        await c.answer(f"Telegram не дал вернуть: {e}", show_alert=True)
-        return
+    is_rub = p.get("currency") == RUB
+    if not is_rub:
+        try:
+            await c.bot.refund_star_payment(user_id=p["user_id"], telegram_payment_charge_id=p["charge_id"])
+        except TelegramAPIError as e:
+            await c.answer(f"Telegram не дал вернуть: {e}", show_alert=True)
+            return
     await db.mark_refunded(p["id"])
     kind, _, value = p["product"].partition(":")
     if kind == "plan":
@@ -115,10 +128,12 @@ async def cb_refund(c: CallbackQuery):
         if user and user.get("theme") == value:
             await db.set_pref(p["user_id"], "theme", None)
     try:
-        await c.bot.send_message(p["user_id"], f"↩️ Тебе вернули <b>{p['stars']} ⭐</b> за «{product_name(p['product'])}».")
+        amount = fmt_price(p["stars"], p.get("currency") or "XTR")
+        when = " Деньги придут на карту в течение нескольких дней." if is_rub else ""
+        await c.bot.send_message(p["user_id"], f"↩️ Тебе вернули <b>{amount}</b> за «{product_name(p['product'])}».{when}")
     except TelegramAPIError:
         pass
-    await c.answer("✅ Звёзды возвращены", show_alert=True)
+    await c.answer("✅ Возврат оформлен" if is_rub else "✅ Звёзды возвращены", show_alert=True)
     await cb_sales(c)
 
 
