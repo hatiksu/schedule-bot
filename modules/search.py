@@ -1,5 +1,3 @@
-"""🔎 Поиск по группам, преподавателям и аудиториям. Также ловит любой текст — «К-11», «Иванов».
-Подключается ПОСЛЕДНИМ, чтобы не перехватывать ввод других модулей."""
 from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup

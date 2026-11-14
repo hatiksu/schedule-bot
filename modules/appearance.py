@@ -1,4 +1,3 @@
-"""🎨 Оформление: темы картинок (с превью), цвет акцента, фон, подпись бота, стиль сообщений, эмодзи."""
 from __future__ import annotations
 
 import asyncio
@@ -28,7 +27,6 @@ BACK = [btn("◀️ К оформлению", "ap:menu")]
 
 
 async def show(c: CallbackQuery, text: str, kb: InlineKeyboardMarkup) -> None:
-    """Редактирует сообщение, а если это фото (превью) — присылает новое."""
     try:
         await c.message.edit_text(text, reply_markup=kb)
     except TelegramAPIError:
@@ -36,7 +34,6 @@ async def show(c: CallbackQuery, text: str, kb: InlineKeyboardMarkup) -> None:
 
 
 def theme_for(user: dict | None, owned: set[str], theme_id: str | None = None):
-    """Тема пользователя с учётом доступа: чужие платные темы и цвета без Premium не применяются."""
     user = user or {}
     tid = theme_id or user.get("theme") or "classic"
     if not can_use_theme(user, tid, owned) and theme_id is None:
@@ -48,7 +45,6 @@ def theme_for(user: dict | None, owned: set[str], theme_id: str | None = None):
 
 
 def bg_photo(user: dict | None) -> str | None:
-    """Путь к своему фото на фоне (только для Premium)."""
     if not is_premium(user) or not (user or {}).get("bg_photo"):
         return None
     path = Path(DATA_DIR) / "bg" / f"{user['user_id']}.jpg"
@@ -77,7 +73,7 @@ async def preview(uid: int, theme_id: str | None = None) -> bytes:
     rows, name = [], "Моя группа"
     if eid:
         name = await db.entity_name(kind, eid) or name
-        for _ in range(7):  # ближайший день с парами — чтобы превью было «живым»
+        for _ in range(7):
             rows = await db.lessons(kind, eid, d.isoformat(), d.isoformat())
             if rows:
                 break
@@ -89,7 +85,6 @@ async def preview(uid: int, theme_id: str | None = None) -> bytes:
                                    bg_photo(user))
 
 
-# ---------- главное меню оформления ----------
 async def menu_view(uid: int) -> tuple[str, InlineKeyboardMarkup]:
     user = await db.get_user(uid) or {}
     prem = is_premium(user)
@@ -135,7 +130,6 @@ async def cb_preview(c: CallbackQuery):
                                  reply_markup=InlineKeyboardMarkup(inline_keyboard=[BACK]))
 
 
-# ---------- темы ----------
 @router.callback_query(F.data == "ap:themes")
 async def cb_themes(c: CallbackQuery):
     user = await db.get_user(c.from_user.id) or {}
@@ -204,7 +198,6 @@ async def cb_buy_theme(c: CallbackQuery):
     await c.answer()
 
 
-# ---------- Premium-настройки ----------
 async def _gate(c: CallbackQuery, feature: str) -> bool:
     user = await db.get_user(c.from_user.id)
     if is_premium(user):
@@ -309,7 +302,7 @@ async def cb_style_set(c: CallbackQuery):
         return
     _, which, key = c.data.split(":")
     await db.set_pref(c.from_user.id, "msg_style" if which == "s" else "emoji_set", key)
-    from utils.core import render  # показываем сразу, как выглядит
+    from utils.core import render
     user = await db.get_user(c.from_user.id)
     await c.answer("✅ Сохранено")
     if user.get("kind"):
@@ -317,7 +310,6 @@ async def cb_style_set(c: CallbackQuery):
         await c.message.answer(chunks[0], reply_markup=kb)
 
 
-# ---------- своё фото на фоне ----------
 class PhotoState(StatesGroup):
     wait = State()
 

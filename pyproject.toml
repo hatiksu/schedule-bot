@@ -10,7 +10,6 @@ target-version = "py311"
 extend-exclude = [".local"]
 
 [tool.ruff.lint]
-# Ошибки, а не стиль: синтаксис, неопределённые и неиспользуемые имена, подозрительные конструкции
 select = ["E9", "F", "B"]
 
 [tool.pytest.ini_options]

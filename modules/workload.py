@@ -1,4 +1,3 @@
-"""📊 Нагрузка: пары, академ. часы, время — за неделю или месяц, по предметам и группам."""
 from __future__ import annotations
 
 import calendar

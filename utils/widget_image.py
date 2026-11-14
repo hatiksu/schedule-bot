@@ -1,8 +1,3 @@
-"""📲 Картинка для виджета на рабочем столе телефона (iPhone — Scriptable, Android — KWGT и т.п.).
-
-Размеры подобраны под виджеты iOS/Android (с запасом по чёткости):
-  s — маленький квадрат, m — широкий, l — большой.
-"""
 from __future__ import annotations
 
 import io
@@ -23,7 +18,7 @@ def _fit(draw, text: str, font_fn, size: int, width: int, min_size: int = 18):
     while draw.textlength(text, font=f) > width and size > min_size:
         size -= 2
         f = font_fn(size)
-    if draw.textlength(text, font=f) > width:  # всё ещё не влезает — обрезаем
+    if draw.textlength(text, font=f) > width:
         while text and draw.textlength(text + "…", font=f) > width:
             text = text[:-1]
         text += "…"
@@ -31,7 +26,6 @@ def _fit(draw, text: str, font_fn, size: int, width: int, min_size: int = 18):
 
 
 def _status(items: list[dict], now: datetime, is_today: bool) -> tuple[str, dict | None, str]:
-    """(вид: now | next | done | none, пара, подпись)"""
     if not items:
         return "none", None, "Пар нет"
     if not is_today:
@@ -58,19 +52,18 @@ def render_widget(size: str, kind: str, name: str, d: date, rows: list[dict], no
     is_today = d == now.date()
     state, cur, caption = _status(items, now, is_today)
 
-    bg = _background(t, H, photo)  # фон темы (с декором) или своё фото, обрезаем по центру
+    bg = _background(t, H, photo)
     left = (bg.width - W) // 2
     img = bg.crop((left, 0, left + W, H))
     draw = ImageDraw.Draw(img)
 
-    # шапка: «Вт 27.10 · Сегодня» и группа
     head = f"{WD_SHORT[d.weekday()]} {d:%d.%m} · {label}"
     draw.text((PAD, PAD - 4), head.upper(), font=F_SEMI(24 if size == "s" else 26), fill=t.accent)
     nm, nf = _fit(draw, name, lambda s: _font(t.title_font, s), 34 if size == "s" else 40, W - 2 * PAD)
     draw.text((PAD, PAD + 30), nm, font=nf, fill=t.text)
     y = PAD + 30 + nf.size + 22
 
-    if size == "s":  # маленький: одна главная пара крупно
+    if size == "s":
         if cur:
             tag = {"now": "Сейчас", "next": "Далее"}.get(state, "")
             draw.text((PAD, y), f"{tag} · {cur['pair']} пара", font=F_SEMI(26), fill=t.muted)
@@ -89,8 +82,8 @@ def render_widget(size: str, kind: str, name: str, d: date, rows: list[dict], no
         tf = F_SEMI(24)
         draw.text(((W - draw.textlength(txt, font=tf)) / 2, H - PAD - 37), txt, font=tf,
                   fill=(255, 255, 255) if state == "now" else t.text)
-    else:  # средний и большой: список пар
-        if size == "m":  # статус справа сверху
+    else:
+        if size == "m":
             st = caption
             sf = F_SEMI(26)
             tw = draw.textlength(st, font=sf)
@@ -106,7 +99,7 @@ def render_widget(size: str, kind: str, name: str, d: date, rows: list[dict], no
         row_h = 74 if size == "m" else 96
         max_rows = max(1, (H - y - PAD) // row_h)
         shown, start = items, 0
-        if len(items) > max_rows:  # не влезает — начинаем с текущей/следующей пары
+        if len(items) > max_rows:
             start = items.index(cur) if cur in items else (len(items) - max_rows if state == "done" else 0)
             start = min(start, len(items) - max_rows)
             shown = items[start:start + max_rows]

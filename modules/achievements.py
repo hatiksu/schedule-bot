@@ -1,4 +1,3 @@
-"""🏆 Достижения: выдаются автоматически, некоторые дарят дни Premium."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -13,7 +12,6 @@ from utils.core import btn, db, log, now
 
 router = Router(name="achievements")
 
-# код: (эмодзи, название, описание, ключ прогресса, цель, дней Premium в награду)
 ACHIEVEMENTS = {
     "start": ("🎓", "Первый шаг", "выбрать группу или преподавателя", "chosen", 1, 0),
     "streak7": ("🔥", "Неделя с ботом", "заходить в бота 7 дней подряд", "streak", 7, 1),
@@ -33,7 +31,6 @@ async def _progress(uid: int) -> dict:
 
 
 async def check(bot: Bot, uid: int) -> None:
-    """Проверяет и выдаёт новые достижения. Вызывается раз в день и после важных действий."""
     try:
         have = await db.achievements(uid)
         prog = await _progress(uid)

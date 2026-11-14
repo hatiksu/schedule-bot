@@ -1,4 +1,3 @@
-"""Картинки-расписания и виджеты: рендерятся во всех темах и дают корректный PNG нужного размера."""
 from datetime import date, datetime
 from io import BytesIO
 
@@ -27,7 +26,7 @@ def png(data: bytes) -> Image.Image:
 @pytest.mark.parametrize("theme", sorted(THEMES))
 def test_render_day_every_theme(theme):
     img = png(render_day("g", "К-11", DAY, ROWS, notes={2: "Сдать лабу"}, now_pair=1, theme=build(theme)))
-    assert img.size == (1080, 1920)  # формат сторис
+    assert img.size == (1080, 1920)
 
 
 def test_render_empty_day_and_week():
@@ -45,5 +44,5 @@ def test_render_widget(size, expected):
 def test_custom_colors():
     t = build("classic", accent_hex="#ff3366", bg_hex="#ffffff")
     assert t.accent == hex2rgb("#ff3366")
-    assert luminance(t.bg) > 0.9 and luminance(t.text) < 0.2  # светлый фон — тёмный текст
+    assert luminance(t.bg) > 0.9 and luminance(t.text) < 0.2
     assert build("нет-такой").id == "classic"

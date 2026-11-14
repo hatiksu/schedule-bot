@@ -1,4 +1,3 @@
-"""🎨 Палитры тем для картинок-расписаний + свой цвет акцента и фон (Premium)."""
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
@@ -23,8 +22,8 @@ def luminance(c: RGB) -> float:
 class Theme:
     id: str
     bg: RGB
-    bg2: RGB            # низ фона (градиент сверху вниз)
-    card: RGB | None    # None — карточки без заливки («Тетрадка»)
+    bg2: RGB
+    card: RGB | None
     card_now: RGB
     text: RGB
     muted: RGB
@@ -32,7 +31,7 @@ class Theme:
     accent2: RGB
     note: RGB
     line: RGB
-    deco: str = "glow"  # glow | grid | blobs | sakura | none | paper | snow | halloween
+    deco: str = "glow"
     outline: bool = False
     title_font: str = "Unbounded-Bold"
     subj_font: str = "Manrope-ExtraBold"
@@ -83,7 +82,6 @@ def build(theme_id: str | None, accent_hex: str | None = None, bg_hex: str | Non
     if accent_hex:
         acc = hex2rgb(accent_hex)
         t = replace(t, accent=acc, accent2=mix(acc, W, 0.35))
-    # подсветка текущей пары — от фона карточки к акценту
     base = t.card or t.bg
     if t.deco != "paper":
         t = replace(t, card_now=mix(base, t.accent, 0.22))

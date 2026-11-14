@@ -1,4 +1,3 @@
-"""Парсер «Экспресс-расписания»: страницы собраны вручную по структуре сайта (без сети)."""
 from bs4 import BeautifulSoup
 
 from utils.site_parser import parse_group_page, parse_index, parse_updated
@@ -58,6 +57,5 @@ def test_parse_group_page():
     assert (web.rooms, web.room_ids, web.teachers, web.teacher_ids) == ("2-25, 2-35", "64,71", "Новиков И. А.", "8")
     assert lessons[2].rooms == ""
     assert all(x.group_id == 12 for x in lessons)
-    # Справочники преподавателей и аудиторий пополняются по ходу разбора
     assert teachers == {7: "Смирнова А. В.", 8: "Новиков И. А.", 9: "Орлова Е. П."}
     assert rooms == {64: "2-25", 71: "2-35"}

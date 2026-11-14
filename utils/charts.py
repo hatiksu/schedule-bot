@@ -1,4 +1,3 @@
-"""📈 Графики для админки (PNG через Pillow — без matplotlib)."""
 from __future__ import annotations
 
 import io
@@ -32,7 +31,7 @@ def chart(title: str, subtitle: str, labels: list[str], bars: list[float] | None
     n = len(labels)
     pw, ph = W - L - R, H - T - B
     top = _nice(max([*(bars or [0]), *(line or [0]), 1]))
-    for i in range(5):  # сетка и подписи по Y
+    for i in range(5):
         y = T + ph - ph * i / 4
         d.line((L, y, W - R, y), fill=GRID, width=1)
         val = top * i / 4
@@ -54,12 +53,12 @@ def chart(title: str, subtitle: str, labels: list[str], bars: list[float] | None
             d.ellipse((x - 9, y - 9, x + 9, y + 9), fill=line_color)
             s = f"{line[-1]:.0f}"
             d.text((x - d.textlength(s, font=F_SEMI(26)) - 14, y - 44), s, font=F_SEMI(26), fill=line_color)
-    every = max(1, n // 8)  # подписи по X
+    every = max(1, n // 8)
     for i, lab in enumerate(labels):
         if i % every == 0 or i == n - 1:
             x = L + step * i + step / 2
             d.text((x - d.textlength(lab, font=F_REG(22)) / 2, T + ph + 18), lab, font=F_REG(22), fill=MUTED)
-    lx = W - R  # легенда
+    lx = W - R
     for name, col in ((line_name, line_color), (bar_name, bar_color)):
         if not name or (col == line_color and not line) or (col == bar_color and not bars):
             continue

@@ -1,4 +1,3 @@
-"""⏰ Звонки: сетка звонков, таймер до звонка, что у тебя сейчас и дальше."""
 from aiogram import F, Router
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command

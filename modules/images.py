@@ -1,4 +1,3 @@
-"""🖼 Расписание картинкой (PNG) — день в формате сторис или вся неделя."""
 from __future__ import annotations
 
 import asyncio
@@ -26,7 +25,7 @@ async def cb_image(c: CallbackQuery):
     mark = watermark(user)
     updated = await db.get_meta("site_updated")
     short_upd = None
-    if updated:  # «23.10.2026 в 13:46» → «23.10 13:46»
+    if updated:
         short_upd = updated.replace(" в ", " ")
         if len(short_upd) > 10 and short_upd[5] == ".":
             short_upd = short_upd[:5] + short_upd[10:]

@@ -1,4 +1,3 @@
-"""🔄 Фоновое обновление расписания с сайта + 🔔 уведомления о заменах."""
 import asyncio
 import time
 from html import escape
@@ -19,8 +18,6 @@ update_lock = asyncio.Lock()
 
 
 async def run_update(bot: Bot, force: bool = False) -> int | None:
-    """Проверяет сайт; если расписание изменилось — перекачивает и рассылает замены.
-    Возвращает число пар или None, если на сайте ничего не менялось."""
     async with update_lock:
         stamp = now().strftime("%d.%m %H:%M")
         t0 = time.monotonic()
@@ -69,7 +66,7 @@ async def run_update(bot: Bot, force: bool = False) -> int | None:
         changed_days = len([k for k in changes if k[0] == "g"])
         await db.log_update(True, force, len(snap.lessons), changed_days, ms())
         log.info("Расписание обновлено: %s пар, изменений: %s", len(snap.lessons), len(changes))
-        if stored is not None:  # при самом первом запуске никого не спамим
+        if stored is not None:
             await notify(bot, changes, old_max, snap.groups)
         return len(snap.lessons)
 

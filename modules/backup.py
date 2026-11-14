@@ -1,10 +1,3 @@
-"""💾 Бэкапы и 📥 импорт пользователей (только для админов).
-
-• каждый день в BACKUP_TIME бот делает копию базы, хранит последние BACKUP_KEEP на сервере
-  и присылает файл админам в Telegram;
-• «Сделать бэкап сейчас», «Восстановить из бэкапа» (текущая база перед этим сохраняется);
-• импорт пользователей: старый schedule.db, users.csv из экспорта или список ID.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -40,7 +33,6 @@ class ImportState(StatesGroup):
     wait = State()
 
 
-# ---------- меню ----------
 @router.callback_query(F.data == "bk:menu")
 async def cb_menu(c: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -80,7 +72,6 @@ async def cb_now(c: CallbackQuery):
     await _send_backup(c.bot, c.from_user.id, path, "Бэкап базы")
 
 
-# ---------- восстановление ----------
 def _name(path: Path) -> str:
     return path.stem.removeprefix("schedule_")
 
@@ -153,7 +144,6 @@ async def cb_restore(c: CallbackQuery):
     await c.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[BACK]))
 
 
-# ---------- импорт ----------
 @router.callback_query(F.data == "bk:imp")
 async def cb_import(c: CallbackQuery, state: FSMContext):
     await state.set_state(ImportState.wait)
@@ -199,7 +189,6 @@ LINE_RE = re.compile(r"^\s*(\d{5,15})\s*[:;,|\t\-–—]?\s*(.*?)\s*$")
 
 
 async def _resolve(name: str) -> tuple[str, int, str] | None:
-    """«К-11» / «Костюк» → (вид, id, название). Сначала точное совпадение, потом единственное похожее."""
     found = await db.search(name, kinds=("g", "t"), limit=10)
     exact = [f for f in found if norm(f[2]) == norm(name)]
     if len(exact) == 1:
@@ -210,7 +199,6 @@ async def _resolve(name: str) -> tuple[str, int, str] | None:
 
 
 async def _import_ids_text(text: str) -> dict | None:
-    """Понимает и просто ID, и строки «ID группа» / «ID фамилия препода»."""
     users, plain_ids, unresolved = [], [], []
     for line in text.splitlines():
         m = LINE_RE.match(line)
@@ -223,13 +211,12 @@ async def _import_ids_text(text: str) -> dict | None:
             else:
                 users.append({"user_id": uid})
                 unresolved.append(f"{uid} {name}")
-        else:  # строка из одних ID (через пробел / запятую)
+        else:
             plain_ids += [int(x) for x in ID_RE.findall(line)]
     users += [{"user_id": uid} for uid in plain_ids]
     if not users:
         return None
     await backup.make_backup(db, "before-import")
-    # если один ID встречается несколько раз — берём строку с группой
     merged: dict[int, dict] = {}
     for u in users:
         if u["user_id"] not in merged or u.get("kind"):
@@ -316,7 +303,6 @@ async def got_file(m: Message, state: FSMContext):
 
 
 async def fill_profiles(bot: Bot, ids: list[int], admin_chat: int) -> None:
-    """Подтягивает имя и @юзернейм из Telegram. Получится у тех, кто не удалял чат с ботом."""
     ok = fail = 0
     for uid in ids:
         try:
@@ -324,7 +310,7 @@ async def fill_profiles(bot: Bot, ids: list[int], admin_chat: int) -> None:
             full = " ".join(x for x in (chat.first_name, chat.last_name) if x) or None
             await db.fill_profile(uid, chat.username, full)
             ok += 1
-        except Exception:  # чат удалён / бот заблокирован / что угодно — просто пропускаем
+        except Exception:
             fail += 1
         await asyncio.sleep(0.05)
     try:
@@ -368,7 +354,6 @@ async def cb_db_file(c: CallbackQuery, state: FSMContext):
     await c.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[BACK]))
 
 
-# ---------- ежедневный автобэкап ----------
 async def loop(bot: Bot) -> None:
     hh, mm = map(int, BACKUP_TIME.split(":"))
     while True:

@@ -1,16 +1,3 @@
-"""Парсер страниц «Экспресс-расписания» (vgek43.ru).
-
-Структура сайта:
-  cg.htm      — список групп, ссылки cgNN.htm
-  cp.htm      — список преподавателей, ссылки cpNN.htm
-  cgNN.htm    — текущее расписание группы (дата → пары → предмет jNN, аудитория caNN, препод cpNN)
-
-Парсим «потоком»: идём по документу сверху вниз и запоминаем последнюю
-встреченную дату, номер пары и время. Так парсер не зависит от того,
-как именно свёрстана таблица (rowspan, вложенные таблицы и т.п.).
-
-Проверка без бота (из папки проекта):  python -m utils.site_parser
-"""
 from __future__ import annotations
 
 import asyncio
@@ -34,12 +21,12 @@ SKIP_PARENTS = {"script", "style", "title", "a"}
 @dataclass(frozen=True)
 class Lesson:
     group_id: int
-    date: str          # ISO: 2026-09-08
+    date: str
     pair: int
-    time: str          # "9:30–10:50"
+    time: str
     subject: str
-    room_ids: str      # "64" или "64,71"
-    rooms: str         # "2-25" или "2-25, 2-35"
+    room_ids: str
+    rooms: str
     teacher_ids: str
     teachers: str
 
@@ -130,7 +117,7 @@ def parse_group_page(
             date_, pair, time_, cur = f"{y}-{mo}-{d}", None, "", None
         elif (m := BARE_PAIR_RE.match(s)) or (m := PAIR_RE.search(s)):
             pair, time_, cur = int(m.group(1)), "", None
-            if (t := TIME_RE.search(s)):  # «4 пара: 12.50-14.10» одной строкой
+            if (t := TIME_RE.search(s)):
                 time_ = f"{t.group(1)}:{t.group(2)}–{t.group(3)}:{t.group(4)}"
         elif (t := TIME_RE.search(s)):
             time_ = f"{t.group(1)}:{t.group(2)}–{t.group(3)}:{t.group(4)}"
@@ -154,7 +141,6 @@ def parse_group_page(
 
 
 async def fetch_updated() -> str | None:
-    """Дата «Обновлено: …» со страницы групп — чтобы не качать всё, если ничего не менялось."""
     async with _client() as client:
         return parse_updated(await _get(client, "cg.htm"))
 
@@ -168,7 +154,7 @@ async def fetch_all(concurrency: int = 5) -> Snapshot:
         try:
             snap.teachers.update(parse_index(await _get(client, "cp.htm"), "cp"))
         except httpx.HTTPError:
-            pass  # не критично: преподы соберутся со страниц групп
+            pass
 
         sem = asyncio.Semaphore(concurrency)
 
@@ -177,8 +163,6 @@ async def fetch_all(concurrency: int = 5) -> Snapshot:
                 soup = await _get(client, f"cg{gid}.htm")
             return parse_group_page(soup, gid, snap.teachers, snap.rooms)
 
-        # если упадёт хоть одна страница — падает всё обновление,
-        # чтобы не записать в базу «половину» расписания и не разослать ложные уведомления
         results = await asyncio.gather(*(one(g) for g in snap.groups))
 
     snap.lessons = sorted(

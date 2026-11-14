@@ -1,4 +1,3 @@
-"""📋 Меню команд бота (у админов дополнительно /admin)."""
 from aiogram import Bot
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import BotCommand, BotCommandScopeChat, MenuButtonCommands
@@ -27,5 +26,5 @@ async def setup(bot: Bot) -> None:
             await bot.set_my_commands(COMMANDS + [BotCommand(command="admin", description="🛠 Админ-панель")],
                                       scope=BotCommandScopeChat(chat_id=admin_id))
         except TelegramAPIError:
-            pass  # админ ещё не писал боту
+            pass
     await bot.set_chat_menu_button(menu_button=MenuButtonCommands())

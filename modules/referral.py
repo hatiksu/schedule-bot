@@ -1,5 +1,3 @@
-"""🤝 Реферальная программа: своя ссылка, +REF_BONUS_DAYS дней Premium за каждого друга,
-который впервые пришёл по ссылке и выбрал группу."""
 from __future__ import annotations
 
 from html import escape
@@ -57,7 +55,6 @@ async def cb_menu(c: CallbackQuery):
 
 
 async def remember_inviter(uid: int, payload: str, is_new: bool) -> None:
-    """/start ref_123 — запоминаем пригласившего, только если пользователь новый."""
     raw = payload.removeprefix("ref_")
     if not is_new or not raw.isdigit() or int(raw) == uid or not await db.user_exists(int(raw)):
         return
@@ -65,7 +62,6 @@ async def remember_inviter(uid: int, payload: str, is_new: bool) -> None:
 
 
 async def reward_inviter(bot: Bot, uid: int) -> None:
-    """Вызывается, когда приглашённый выбрал группу. Бонус — один раз."""
     inviter = await db.take_referral_reward(uid)
     if not inviter:
         return

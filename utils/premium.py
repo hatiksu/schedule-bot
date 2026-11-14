@@ -1,4 +1,3 @@
-"""⭐ Premium: товары, цены в Telegram Stars и рублях (API ЮKassa, от 1 ₽), темы, проверки доступа."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -7,27 +6,23 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 FOREVER = "9999-12-31 23:59:59"
 TRIAL_DAYS = 3
-FREE_NOTES = 5  # без Premium — столько активных заметок (на сегодня и вперёд)
+FREE_NOTES = 5
 FAV_LIMIT = 10
 
-# id: (название, звёзды, дней; None = навсегда)
 PLANS = {
     "month": ("⭐ Premium на месяц", 15, 30),
     "year": ("⭐ Premium на год", 99, 365),
     "forever": ("👑 Premium навсегда", 199, None),
 }
-# Донат — любая сумма от 1; это только быстрые кнопки
 DONATES = [1, 5, 10, 25, 50, 100]
 DONATE_MIN = 1
 
-# --- 💳 цены в рублях (карта / СБП / ЮMoney через API ЮKassa) ---
 STARS = "XTR"
 RUB = "RUB"
 RUB_PLANS = {"month": 29, "year": 199, "forever": 399}
 RUB_THEMES = {"neon": 19, "pastel": 19, "anime": 29, "minimal": 9, "notebook": 19, "newyear": 9, "halloween": 9}
 RUB_DONATES = [1, 10, 50, 100, 300, 1000]
 
-# id: (название, эмодзи, цена отдельно; 0 — бесплатно для всех)
 THEMES = {
     "classic": ("Классика", "🌌", 0),
     "neon": ("Неон", "💜", 10),
@@ -74,7 +69,6 @@ FEATURES = (
 
 
 def price(product: str, currency: str = STARS) -> int | None:
-    """Цена товара: в звёздах (XTR) или рублях (RUB). None — такого товара нет в этой валюте."""
     kind, _, value = product.partition(":")
     if currency == STARS:
         if kind in ("plan", "gift") and value in PLANS:
@@ -98,7 +92,6 @@ def fmt_price(amount: int, currency: str = STARS) -> str:
 
 
 def price_label(product: str, rub: bool) -> str:
-    """«15 ⭐» или «15 ⭐ / 29 ₽» — для кнопок, когда включена оплата в рублях."""
     stars, rubles = price(product, STARS), price(product, RUB)
     parts = [fmt_price(stars)] if stars else []
     if rub and rubles:
@@ -107,7 +100,6 @@ def price_label(product: str, rub: bool) -> str:
 
 
 def product_title(product: str) -> tuple[str, str]:
-    """Название и описание товара для счёта."""
     kind, _, value = product.partition(":")
     if kind == "plan" and value in PLANS:
         title, _, days = PLANS[value]
@@ -125,7 +117,7 @@ def product_title(product: str) -> tuple[str, str]:
 
 
 def _now_str() -> str:
-    from utils.core import now  # здесь, чтобы не было циклического импорта
+    from utils.core import now
     return now().strftime("%Y-%m-%d %H:%M:%S")
 
 
@@ -151,7 +143,6 @@ def can_use_theme(user: dict | None, theme: str, owned: set[str]) -> bool:
 
 
 def icons_for(user: dict | None) -> dict:
-    """Набор эмодзи пользователя (только для Premium, иначе — классика)."""
     if is_premium(user):
         return EMOJI_SETS.get(user.get("emoji_set") or "classic", EMOJI_SETS["classic"])[1]
     return DEFAULT_ICONS

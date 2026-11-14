@@ -1,4 +1,3 @@
-"""🚨 Алерты админам: сайт колледжа не отвечает, пар подозрительно мало, ошибки в коде бота."""
 from __future__ import annotations
 
 import time
@@ -12,7 +11,7 @@ from aiogram.types import ErrorEvent
 from config import ADMIN_IDS
 from utils.core import log
 
-_last: dict[str, float] = {}  # ключ алерта → когда отправляли (чтобы не спамить)
+_last: dict[str, float] = {}
 
 
 async def alert(bot: Bot, text: str, key: str | None = None, cooldown: int = 600) -> None:

@@ -1,4 +1,3 @@
-"""⭐ Админка Premium: продажи и выручка (звёзды и рубли), возвраты, промокоды, выдача Premium вручную."""
 from __future__ import annotations
 
 import re
@@ -67,7 +66,6 @@ async def cb_menu(c: CallbackQuery, state: FSMContext):
     await c.answer()
 
 
-# ---------- покупки и возвраты ----------
 @router.callback_query(F.data == "pa:sales")
 async def cb_sales(c: CallbackQuery):
     items = await db.purchases(15)
@@ -146,7 +144,6 @@ async def cb_refund(c: CallbackQuery):
     await cb_sales(c)
 
 
-# ---------- промокоды ----------
 @router.callback_query(F.data == "pa:promos")
 async def cb_promos(c: CallbackQuery, state: FSMContext):
     await state.clear()
@@ -196,7 +193,6 @@ async def cb_promo_del(c: CallbackQuery, state: FSMContext):
     await cb_promos(c, state)
 
 
-# ---------- выдать Premium пользователю (из карточки в админке) ----------
 @router.callback_query(F.data.startswith("pa:give:"))
 async def cb_give(c: CallbackQuery):
     uid = int(c.data.split(":")[2])

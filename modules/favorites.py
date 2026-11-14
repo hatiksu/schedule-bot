@@ -1,5 +1,3 @@
-"""⭐ Избранное (Premium): несколько групп / преподавателей / аудиторий с быстрым переключением.
-Добавить — кнопкой ☆ под чужим расписанием (найди через поиск)."""
 from __future__ import annotations
 
 from datetime import date
@@ -54,7 +52,6 @@ async def cb_remove(c: CallbackQuery):
     await c.answer("Убрано из избранного")
 
 
-# fav:t:<kind>:<id>:<scope>:<date> — кнопка ☆/★ под расписанием
 @router.callback_query(F.data.startswith("fav:t:"))
 async def cb_toggle(c: CallbackQuery):
     _, _, kind, eid, scope, raw = c.data.split(":")

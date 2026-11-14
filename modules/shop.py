@@ -1,10 +1,3 @@
-"""⭐ Premium: витрина, оплата Telegram Stars или рублями через ЮKassa, пробный период, промокоды, донаты.
-
-Звёзды (валюта XTR) — встроенная оплата Telegram, без ИП и эквайринга.
-Рубли (RUB) — платёж по ссылке через API ЮKassa (карта, СБП, ЮMoney), минимум 1 ₽: бот создаёт платёж,
-показывает кнопку «Оплатить» и сам проверяет статус в фоне — вебхуки и свой сервер не нужны.
-Если ключей ЮKassa нет, бот работает как раньше — только звёзды.
-"""
 from __future__ import annotations
 
 import asyncio
@@ -30,7 +23,7 @@ from utils.yookassa import YooKassa, YooKassaError, receipt_for
 
 router = Router(name="premium")
 yookassa = YooKassa(YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY)
-PENDING_TTL_HOURS = 24  # столько ждём оплату по ссылке ЮKassa
+PENDING_TTL_HOURS = 24
 
 
 class PromoState(StatesGroup):
@@ -38,12 +31,10 @@ class PromoState(StatesGroup):
 
 
 def price_of(product: str) -> int | None:
-    """Сколько звёзд стоит товар (для проверки перед оплатой)."""
     return price(product, STARS)
 
 
 def rub_enabled() -> bool:
-    """Подключена ли оплата в рублях через API ЮKassa."""
     return yookassa.enabled
 
 
@@ -53,7 +44,6 @@ def _until_human(until: str) -> str:
     return "до " + datetime.strptime(until, "%Y-%m-%d %H:%M:%S").strftime("%d.%m.%Y")
 
 
-# ---------- витрина ----------
 async def menu_view(uid: int) -> tuple[str, InlineKeyboardMarkup]:
     user = await db.get_user(uid) or {}
     active = is_premium(user)
@@ -98,12 +88,11 @@ async def cb_menu(c: CallbackQuery, state: FSMContext):
     text, kb = await menu_view(c.from_user.id)
     try:
         await c.message.edit_text(text, reply_markup=kb)
-    except TelegramAPIError:  # если это было фото (превью темы) — шлём новым сообщением
+    except TelegramAPIError:
         await c.message.answer(text, reply_markup=kb)
     await c.answer()
 
 
-# ---------- пробный период ----------
 @router.callback_query(F.data == "pm:trial")
 async def cb_trial(c: CallbackQuery):
     user = await db.get_user(c.from_user.id) or {}
@@ -128,11 +117,7 @@ def _after_kb() -> InlineKeyboardMarkup:
     ])
 
 
-# ---------- оплата ----------
 async def send_invoice(message: Message, product: str, currency: str | None = None, uid: int | None = None) -> None:
-    """Оплата товара. Без валюты и с подключённой ЮKassa — сначала спрашиваем способ оплаты.
-
-    uid — кто покупает (у сообщения бота from_user — сам бот, поэтому id передаём явно)."""
     if currency is None:
         if rub_enabled() and price(product, RUB):
             await ask_method(message, product)
@@ -150,7 +135,6 @@ async def send_invoice(message: Message, product: str, currency: str | None = No
         await message.answer_invoice(title=title, description=description, payload=product, currency=STARS,
                                      prices=[LabeledPrice(label=title, amount=amount)])
     except TelegramBadRequest:
-        # Например, слишком большая сумма для одного платежа звёздами
         await message.answer(f"Telegram не принимает {fmt_price(amount)} одним платежом — попробуй сумму поменьше 🙏")
 
 
@@ -182,7 +166,6 @@ async def cb_pay(c: CallbackQuery, state: FSMContext):
     await c.answer()
 
 
-# ---------- 💳 рубли через API ЮKassa ----------
 class EmailState(StatesGroup):
     email = State()
 
@@ -241,10 +224,9 @@ async def start_rub_payment(message: Message, uid: int, product: str, amount: in
 
 
 async def settle(bot: Bot, pending: dict, status: str) -> bool:
-    """Закрывает платёж ЮKassa по его статусу. True — если платёж завершён (успешно или нет)."""
     if status == "succeeded":
         if not await db.finish_pending(pending["id"], "succeeded"):
-            return True  # уже выдали (например, проверка из кнопки и из фона одновременно)
+            return True
         await fulfill(bot, pending["user_id"], pending["chat_id"], pending["product"], pending["amount"], RUB,
                       charge_id=pending["id"], provider_charge_id=pending["id"])
         return True
@@ -279,7 +261,6 @@ async def check_rub_payment(c: CallbackQuery, payment_id: str) -> None:
 
 
 async def payments_loop(bot: Bot) -> None:
-    """Фоновая проверка неоплаченных платежей ЮKassa: выдаём покупку, как только деньги пришли."""
     if not rub_enabled():
         return
     while True:
@@ -292,14 +273,13 @@ async def payments_loop(bot: Bot) -> None:
                     log.warning("ЮKassa: статус %s: %s", pending["id"], e)
                     continue
                 if not await settle(bot, pending, payment.status) and age > timedelta(hours=PENDING_TTL_HOURS):
-                    await db.finish_pending(pending["id"], "expired")  # ссылку так и не оплатили
+                    await db.finish_pending(pending["id"], "expired")
                 await asyncio.sleep(0.3)
         except Exception:
             log.exception("Ошибка проверки платежей ЮKassa")
         await asyncio.sleep(20)
 
 
-# ---------- витрина покупок ----------
 @router.callback_query(F.data.startswith("pm:buy:"))
 async def cb_buy(c: CallbackQuery):
     plan = c.data.split(":")[2]
@@ -342,7 +322,6 @@ async def cb_donate_custom(c: CallbackQuery, state: FSMContext):
 
 
 def parse_donation(text: str, rub_allowed: bool) -> tuple[int, str] | None:
-    """«50» → (50, звёзды); «150 р», «150₽», «150 руб» → (150, рубли). None — не сумма."""
     m = re.fullmatch(r"\s*(\d{1,9})\s*(⭐|звезд\w*|зв|stars?|₽|р|р\.|руб\w*|rub)?\s*", text.lower().replace("ё", "е"))
     if not m or int(m.group(1)) < DONATE_MIN:
         return None
@@ -380,9 +359,7 @@ async def cb_donate_rub(c: CallbackQuery, state: FSMContext):
     await c.answer()
 
 
-# ---------- звёзды: проверка и зачисление ----------
 def expected_total(product: str, currency: str) -> int | None:
-    """Сколько звёзд должен заплатить пользователь (счета Telegram у нас только в звёздах)."""
     return price(product, STARS) if currency == STARS else None
 
 
@@ -396,7 +373,6 @@ async def pre_checkout(q: PreCheckoutQuery):
 
 
 async def apply_purchase(uid: int, product: str) -> str:
-    """Выдаёт купленное. Возвращает текст для пользователя."""
     kind, _, value = product.partition(":")
     if kind == "plan":
         until = await db.extend_premium(uid, PLANS[value][2])
@@ -411,7 +387,6 @@ async def apply_purchase(uid: int, product: str) -> str:
 
 async def fulfill(bot: Bot, uid: int, chat_id: int, product: str, amount: int, currency: str,
                   charge_id: str, provider_charge_id: str | None = None) -> None:
-    """Общее для звёзд и рублей: записать покупку, выдать товар, поблагодарить, сообщить админам."""
     await db.add_purchase(uid, product, amount, charge_id, currency=currency, provider_charge_id=provider_charge_id)
     if product.startswith("gift:"):
         from modules.gifts import after_purchase
@@ -440,7 +415,6 @@ async def got_payment(m: Message):
                   charge_id=sp.telegram_payment_charge_id)
 
 
-# ---------- промокод ----------
 @router.callback_query(F.data == "pm:promo")
 async def cb_promo(c: CallbackQuery, state: FSMContext):
     await state.set_state(PromoState.code)
@@ -462,7 +436,6 @@ async def got_promo(m: Message, state: FSMContext):
                    reply_markup=_after_kb())
 
 
-# ---------- предупреждение об окончании ----------
 async def loop(bot: Bot) -> None:
     while True:
         try:

@@ -1,5 +1,3 @@
-"""Оплата звёздами и рублями (API ЮKassa): цены, донаты на любую сумму, проверка перед оплатой,
-клиент ЮKassa и выдача покупки ровно один раз."""
 import asyncio
 import json
 import sqlite3
@@ -15,7 +13,6 @@ from utils.premium import (DONATE_MIN, PLANS, RUB, RUB_PLANS, RUB_THEMES, STARS,
 from utils.yookassa import YooKassa, YooKassaError, payment_body, receipt_for
 
 
-# ---------- цены ----------
 def test_every_paid_product_has_both_prices():
     for plan in PLANS:
         for kind in ("plan", "gift"):
@@ -29,7 +26,6 @@ def test_every_paid_product_has_both_prices():
 def test_prices_are_democratic():
     assert PLANS["month"][1] <= 20 and RUB_PLANS["month"] <= 39
     assert all(cost <= 15 for _, _, cost in THEMES.values())
-    # Год выгоднее 12 месяцев, «навсегда» дороже года
     assert PLANS["year"][1] < PLANS["month"][1] * 12 < PLANS["forever"][1] * 2
     assert RUB_PLANS["year"] < RUB_PLANS["month"] * 12 and RUB_PLANS["forever"] > RUB_PLANS["year"]
 
@@ -58,7 +54,7 @@ def test_price_label_and_titles():
     ("150₽", True, (150, RUB)),
     ("1000 руб", True, (1000, RUB)),
     ("25 звёзд", True, (25, STARS)),
-    ("150 р", False, None),   # ЮKassa не подключена — рубли не принимаем
+    ("150 р", False, None),
     ("0", True, None),
     ("много", True, None),
     ("1.5", True, None),
@@ -67,7 +63,6 @@ def test_parse_donation(text, rub, expected):
     assert shop.parse_donation(text, rub) == expected
 
 
-# ---------- звёзды: проверка перед оплатой ----------
 class FakeQuery:
     def __init__(self, payload: str, currency: str, total: int):
         self.invoice_payload, self.currency, self.total_amount = payload, currency, total
@@ -79,9 +74,9 @@ class FakeQuery:
 
 @pytest.mark.parametrize(("payload", "currency", "total", "ok"), [
     ("plan:month", STARS, PLANS["month"][1], True),
-    ("plan:month", STARS, PLANS["month"][1] - 1, False),  # подменённая сумма
+    ("plan:month", STARS, PLANS["month"][1] - 1, False),
     ("donate:4321", STARS, 4321, True),
-    ("plan:month", RUB, RUB_PLANS["month"] * 100, False),  # рубли идут через ЮKassa, не через счёт Telegram
+    ("plan:month", RUB, RUB_PLANS["month"] * 100, False),
     ("theme:classic", STARS, 0, False),
 ])
 def test_pre_checkout(payload, currency, total, ok):
@@ -90,7 +85,6 @@ def test_pre_checkout(payload, currency, total, ok):
     assert q.result is ok
 
 
-# ---------- клиент ЮKassa ----------
 def test_payment_body_and_receipt():
     body = payment_body(29, "⭐ Premium на месяц", "https://t.me/bot", {"user_id": 5, "product": "plan:month"},
                         receipt_for("⭐ Premium на месяц", 29, "a@b.ru"))
@@ -132,11 +126,9 @@ def test_client_requests():
     assert YooKassa("", "").enabled is False
 
 
-# ---------- база: миграция, выручка, ожидающие платежи ----------
 @pytest.fixture
 def db(tmp_path, monkeypatch):
     path = tmp_path / "test.db"
-    # Старая схема покупок — без валюты: миграция должна добавить колонки
     con = sqlite3.connect(path)
     con.execute("CREATE TABLE purchases (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, product TEXT, "
                 "stars INTEGER, charge_id TEXT, created_at TEXT, refunded INTEGER NOT NULL DEFAULT 0)")
@@ -144,7 +136,7 @@ def db(tmp_path, monkeypatch):
                 "VALUES (1, 'plan:month', 30, 'old', '2026-01-05 10:00:00')")
     con.commit()
     con.close()
-    d = core.db  # общий объект базы, через который работают модули бота
+    d = core.db
     monkeypatch.setattr(d, "path", str(path))
     asyncio.run(d.connect())
     yield d
@@ -155,7 +147,7 @@ def test_revenue_split_by_currency(db: DB):
     async def scenario():
         await db.add_purchase(2, "plan:year", 99, "tg1")
         await db.add_purchase(3, "plan:month", 29, "yk-1", currency=RUB, provider_charge_id="yk-1")
-        await db.add_purchase(5, "trial", 0, None)  # без оплаты — не выручка
+        await db.add_purchase(5, "trial", 0, None)
         return await db.premium_stats("2026-11-16 00:00:00", "2026-11-01 00:00:00")
 
     stats = asyncio.run(scenario())
@@ -177,13 +169,13 @@ def test_rub_payment_settles_once(db: DB):
         await db.touch_user(42, "anna", "Анна")
         await db.add_pending("pay-1", 42, "plan:month", RUB_PLANS["month"], 42)
         pending = await db.get_pending("pay-1")
-        assert await shop.settle(bot, pending, "pending") is False  # ещё не оплачено
+        assert await shop.settle(bot, pending, "pending") is False
         assert await shop.settle(bot, pending, "succeeded") is True
-        assert await shop.settle(bot, pending, "succeeded") is True  # повторная проверка — без второй выдачи
+        assert await shop.settle(bot, pending, "succeeded") is True
         return await db.get_user(42), await db.purchases(5), await db.get_pending("pay-1")
 
     user, purchases, pending = asyncio.run(scenario())
-    assert user["premium_until"]  # Premium выдан
+    assert user["premium_until"]
     rub = [p for p in purchases if p["currency"] == RUB]
     assert len(rub) == 1 and rub[0]["stars"] == RUB_PLANS["month"] and rub[0]["provider_charge_id"] == "pay-1"
     assert pending["status"] == "succeeded"

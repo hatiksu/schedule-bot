@@ -1,8 +1,3 @@
-"""🖼 Картинка-расписание (PNG) — для беседы или сторис. Поддерживает темы (utils/themes.py).
-
-День рисуется в формате сторис 1080×1920 (контент по центру, если пар мало),
-неделя — длинной карточкой шириной 1080.
-"""
 from __future__ import annotations
 
 import io
@@ -64,9 +59,7 @@ def _wrap(draw: ImageDraw.ImageDraw, text: str, font, width: int, max_lines: int
     return lines
 
 
-# ---------- фон и декор тем ----------
 def _photo_background(t: Theme, H: int, path: str) -> Image.Image:
-    """Своё фото на фоне: обрезаем по центру и затемняем/осветляем под тему, чтобы текст читался."""
     photo = Image.open(path).convert("RGB")
     k = max(W / photo.width, H / photo.height)
     photo = photo.resize((int(photo.width * k) + 1, int(photo.height * k) + 1), Image.LANCZOS)
@@ -81,13 +74,13 @@ def _background(t: Theme, H: int, photo: str | None = None) -> Image.Image:
         try:
             return _photo_background(t, H, photo)
         except Exception:
-            pass  # файл испорчен — рисуем обычный фон темы
+            pass
     img = Image.new("RGB", (W, H), t.bg)
     d = ImageDraw.Draw(img)
     if t.bg2 != t.bg:
         for y in range(H):
             d.line([(0, y), (W, y)], fill=mix(t.bg, t.bg2, y / H))
-    rnd = random.Random(42)  # декор одинаковый при каждой генерации
+    rnd = random.Random(42)
     layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     ld = ImageDraw.Draw(layer)
 
@@ -95,7 +88,7 @@ def _background(t: Theme, H: int, photo: str | None = None) -> Image.Image:
         for i in range(520):
             k = (1 - i / 520) ** 2 * (0.30 if t.deco == "grid" else 0.20)
             ld.line([(0, i), (W, i)], fill=(*t.accent, int(255 * k)))
-    if t.deco == "grid":  # synthwave-сетка снизу
+    if t.deco == "grid":
         horizon = int(H * 0.72)
         for i in range(14):
             y = horizon + int((H - horizon) * (i / 13) ** 1.8)
@@ -157,7 +150,7 @@ def _gradient_bar(img: Image.Image, t: Theme, x: int, y: int, w: int, h: int) ->
 
 
 def _card(draw: ImageDraw.ImageDraw, t: Theme, box, now: bool = False, radius: int = 36) -> None:
-    if t.card is None:  # «Тетрадка»: без карточек, текущая пара — маркером
+    if t.card is None:
         if now:
             draw.rounded_rectangle(box, radius=12, fill=t.card_now)
         return
@@ -211,7 +204,6 @@ def _to_png(img: Image.Image) -> bytes:
     return buf.getvalue()
 
 
-# ---------- день ----------
 def _day_blocks(draw, t: Theme, kind: str, items: list[dict], notes: dict[int, str]) -> list[tuple]:
     blocks, prev = [], None
     sf, mf, nf = F_SUBJ(t, 44), F_REG(30), F_SEMI(30)
@@ -298,7 +290,6 @@ def render_day(kind: str, name: str, d: date, rows: list[dict], notes: dict[int,
     return _to_png(img)
 
 
-# ---------- неделя ----------
 def render_week(kind: str, name: str, monday: date, rows: list[dict],
                 notes: dict[tuple[str, int], str] | None = None,
                 bot_username: str | None = None, updated: str | None = None,

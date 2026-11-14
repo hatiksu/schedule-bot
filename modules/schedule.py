@@ -1,4 +1,3 @@
-"""📅 Расписание: кнопки «Сегодня / Завтра / Неделя / След. неделя» и листание ◀️ ▶️."""
 from datetime import date
 
 from aiogram import F, Router
@@ -20,16 +19,15 @@ async def my_schedule(m: Message, state: FSMContext):
         await send_schedule(m, user["kind"], user["target_id"], scope, d, m.from_user.id)
 
 
-# v:<kind>:<id>:<d|w>:<YYYY-MM-DD | t>
 @router.callback_query(F.data.startswith("v:"))
 async def cb_view(c: CallbackQuery):
     try:
         _, kind, eid, scope, raw = c.data.split(":")
-    except ValueError:  # кнопки от старой версии бота
+    except ValueError:
         await c.answer("Кнопка устарела, нажми «📅 Сегодня» внизу", show_alert=True)
         return
     d = now().date() if raw == "t" else date.fromisoformat(raw)
-    if c.inline_message_id:  # сообщение отправлено через inline-режим в чужой чат
+    if c.inline_message_id:
         chunks, kb = await render(kind, int(eid), scope, d, private=False)
         try:
             await c.bot.edit_message_text(chunks[0], inline_message_id=c.inline_message_id, reply_markup=kb)
@@ -42,7 +40,7 @@ async def cb_view(c: CallbackQuery):
         try:
             await c.message.edit_text(chunks[0], reply_markup=kb)
         except TelegramBadRequest:
-            pass  # «message is not modified»
+            pass
     else:
         await send_schedule(c.message, kind, int(eid), scope, d, c.from_user.id)
     await c.answer()

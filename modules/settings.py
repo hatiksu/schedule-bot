@@ -1,4 +1,3 @@
-"""⚙️ Настройки: смена группы/препода, уведомления о заменах, вход в авторассылку и обратную связь."""
 from html import escape
 
 from aiogram import F, Router
@@ -60,7 +59,7 @@ async def cb_home(c: CallbackQuery, state: FSMContext):
         text, kb = await settings_view(user)
         try:
             await c.message.edit_text(text, reply_markup=kb)
-        except TelegramAPIError:  # если это было фото — шлём новым сообщением
+        except TelegramAPIError:
             await c.message.answer(text, reply_markup=kb)
     await c.answer()
 

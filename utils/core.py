@@ -1,4 +1,3 @@
-"""Общее для всех модулей: база, время, клавиатуры, показ расписания."""
 from __future__ import annotations
 
 import logging
@@ -14,14 +13,13 @@ from utils.formatting import (KIND_ICON, days_word, format_day, format_week, sho
 
 log = logging.getLogger("schedule_bot")
 db = DB(DB_PATH, TZ)
-runtime = {"maintenance": False, "bot_username": None}  # быстрые флаги без запроса к БД
+runtime = {"maintenance": False, "bot_username": None}
 
 
 def now() -> datetime:
     return datetime.now(TZ).replace(tzinfo=None)
 
 
-# ---------- кнопки меню ----------
 BTN_TODAY, BTN_TOMORROW = "📅 Сегодня", "➡️ Завтра"
 BTN_WEEK, BTN_NEXT = "🗓 Неделя", "⏭ След. неделя"
 BTN_SEARCH, BTN_ROOMS, BTN_BELLS = "🔎 Поиск", "🏫 Аудитории", "⏰ Звонки"
@@ -49,11 +47,8 @@ def btn(text: str, data: str) -> InlineKeyboardButton:
     return InlineKeyboardButton(text=text, callback_data=data)
 
 
-# ---------- навигация под расписанием ----------
-# v:<kind>:<id>:<d|w>:<YYYY-MM-DD | t>   («t» = сегодня)
 def nav_kb(kind: str, eid: int, scope: str, d: date, private: bool = True,
            fav: bool | None = None) -> InlineKeyboardMarkup:
-    """fav: None — кнопку избранного не показываем (своё расписание), True/False — в избранном или нет."""
     base = f"v:{kind}:{eid}"
     if scope == "d":
         prev, nxt = study_day(d, -1), study_day(d, 1)
@@ -63,7 +58,7 @@ def nav_kb(kind: str, eid: int, scope: str, d: date, private: bool = True,
         rows = [[btn("◀️ Пред. неделя", f"{base}:w:{d - timedelta(days=7)}"),
                  btn("След. неделя ▶️", f"{base}:w:{d + timedelta(days=7)}")]]
     rows.append([btn("📅 Сегодня", f"{base}:d:t"), btn("🗓 Неделя", f"{base}:w:{week_start(d)}")])
-    if private:  # в чужих чатах (inline-режим) заметки и картинки не показываем
+    if private:
         extra = [btn("🖼 Картинкой", f"img:{kind}:{eid}:{scope}:{d}")]
         if scope == "d":
             extra.insert(0, btn("📝 Заметка", f"nt:{kind}:{eid}:{d}"))
@@ -86,7 +81,6 @@ def pick_kb(found: list[tuple], prefix: str, suffix: str = "") -> InlineKeyboard
 
 
 async def chosen_name(user: dict) -> str:
-    """Название группы / ФИО препода: с сайта, а если его там уже нет — из сохранённого в БД."""
     return (await db.entity_name(user["kind"], user["target_id"])
             or user.get("target_name") or "не найдено на сайте")
 
@@ -99,7 +93,6 @@ async def require_user(m: Message) -> dict | None:
     return user
 
 
-# ---------- отсчёты: выходные, каникулы, «завтра пар нет» ----------
 async def holiday() -> tuple[date, date | None, str] | None:
     start = await db.get_meta("holiday_start")
     if not start:
@@ -132,10 +125,9 @@ async def day_extras(kind: str, eid: int, d: date) -> list[str]:
     return lines
 
 
-# ---------- показ расписания ----------
 async def render(kind: str, eid: int, scope: str, d: date, uid: int | None = None,
                  private: bool = True) -> tuple[list[str], InlineKeyboardMarkup]:
-    from utils.premium import icons_for, style_for  # здесь, чтобы не было циклического импорта
+    from utils.premium import icons_for, style_for
     n = now()
     name = await db.entity_name(kind, eid) or "?"
     updated = await db.get_meta("site_updated")
@@ -175,7 +167,7 @@ def resolve(mode: str) -> tuple[str, date]:
     if mode == BTN_TOMORROW:
         return "d", study_day(today, 1)
     monday = week_start(today)
-    if today.weekday() == 6:  # в воскресенье «неделя» — уже следующая
+    if today.weekday() == 6:
         monday += timedelta(days=7)
     if mode == BTN_NEXT:
         monday += timedelta(days=7)

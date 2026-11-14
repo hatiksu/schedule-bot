@@ -11,19 +11,19 @@ from utils.site_parser import Lesson, Snapshot
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS users (
-    user_id       INTEGER PRIMARY KEY,   -- Telegram ID
-    username      TEXT,                  -- @username (может не быть)
-    full_name     TEXT,                  -- имя в Telegram
-    kind          TEXT,                  -- выбор: 'g' группа | 't' преподаватель (NULL — ещё не выбрал)
-    target_id     INTEGER,               -- ID группы/препода с сайта
-    target_name   TEXT,                  -- название группы/ФИО препода (для удобного просмотра БД)
+    user_id       INTEGER PRIMARY KEY,
+    username      TEXT,
+    full_name     TEXT,
+    kind          TEXT,
+    target_id     INTEGER,
+    target_name   TEXT,
     notify        INTEGER NOT NULL DEFAULT 1,
-    registered_at TEXT,                  -- дата регистрации (первый контакт с ботом)
-    last_seen     TEXT,                  -- когда последний раз пользовался ботом
+    registered_at TEXT,
+    last_seen     TEXT,
     banned        INTEGER NOT NULL DEFAULT 0,
-    digest_mode   TEXT,                  -- авторассылка: 'evening' (на завтра) | 'morning' (на сегодня)
-    digest_time   TEXT,                  -- «20:00»
-    last_digest   TEXT                   -- дата последней авторассылки (чтобы не слать дважды)
+    digest_mode   TEXT,
+    digest_time   TEXT,
+    last_digest   TEXT
 );
 CREATE TABLE IF NOT EXISTS notes (
     user_id INTEGER, kind TEXT, target_id INTEGER, date TEXT, pair INTEGER, text TEXT,
@@ -40,22 +40,22 @@ CREATE TABLE IF NOT EXISTS feedback (
 CREATE TABLE IF NOT EXISTS purchases (
     id         INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id    INTEGER,
-    product    TEXT,                 -- plan:month | theme:neon | donate:50 | grant:30 (выдал админ)
-    stars      INTEGER,              -- сумма в валюте покупки: звёзды (XTR) или рубли (RUB)
-    charge_id  TEXT,                 -- telegram_payment_charge_id (нужен для возврата звёзд)
+    product    TEXT,
+    stars      INTEGER,
+    charge_id  TEXT,
     created_at TEXT,
     refunded   INTEGER NOT NULL DEFAULT 0,
     currency   TEXT NOT NULL DEFAULT 'XTR',
-    provider_charge_id TEXT          -- id платежа в ЮKassa (для возврата рублей в личном кабинете)
+    provider_charge_id TEXT
 );
-CREATE TABLE IF NOT EXISTS pending_payments (   -- 💳 платежи ЮKassa, которые ещё не оплачены
-    id         TEXT PRIMARY KEY,                    -- id платежа в ЮKassa
+CREATE TABLE IF NOT EXISTS pending_payments (
+    id         TEXT PRIMARY KEY,
     user_id    INTEGER,
     product    TEXT,
-    amount     INTEGER,                             -- рубли
+    amount     INTEGER,
     chat_id    INTEGER,
     created_at TEXT,
-    status     TEXT NOT NULL DEFAULT 'pending'      -- pending | succeeded | canceled | expired
+    status     TEXT NOT NULL DEFAULT 'pending'
 );
 CREATE TABLE IF NOT EXISTS owned_themes (user_id INTEGER, theme TEXT, PRIMARY KEY (user_id, theme));
 CREATE TABLE IF NOT EXISTS favorites (
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS favorites (
     PRIMARY KEY (user_id, kind, target_id)
 );
 CREATE TABLE IF NOT EXISTS promos (
-    code TEXT PRIMARY KEY, days INTEGER, uses_left INTEGER, created_at TEXT  -- days 0 = навсегда, uses -1 = безлимит
+    code TEXT PRIMARY KEY, days INTEGER, uses_left INTEGER, created_at TEXT
 );
 CREATE TABLE IF NOT EXISTS promo_uses (user_id INTEGER, code TEXT, used_at TEXT, PRIMARY KEY (user_id, code));
 CREATE TABLE IF NOT EXISTS gifts (
@@ -79,16 +79,16 @@ CREATE TABLE IF NOT EXISTS update_log (
     at          TEXT,
     ok          INTEGER,
     forced      INTEGER,
-    lessons     INTEGER,             -- NULL — сайт не менялся, выгрузку не качали
+    lessons     INTEGER,
     changes     INTEGER,
     duration_ms INTEGER,
     error       TEXT
 );
 CREATE TABLE IF NOT EXISTS entities (
-    kind TEXT NOT NULL,               -- 'g' | 't' | 'r' (аудитория)
-    id   INTEGER NOT NULL,            -- ID с сайта (cg87 -> 87)
+    kind TEXT NOT NULL,
+    id   INTEGER NOT NULL,
     name TEXT NOT NULL,
-    norm TEXT NOT NULL,               -- для поиска: «ИС-21» -> «ис21»
+    norm TEXT NOT NULL,
     PRIMARY KEY (kind, id)
 );
 CREATE TABLE IF NOT EXISTS lessons (
@@ -114,7 +114,6 @@ def _sig(l: Lesson) -> tuple:
 
 
 def _by_target(lessons: list[Lesson]) -> dict[tuple, list[Lesson]]:
-    """(вид, id, дата) -> пары этого дня. Нужно, чтобы понять, у кого что поменялось."""
     idx: dict[tuple, list[Lesson]] = defaultdict(list)
     for l in lessons:
         idx[("g", l.group_id, l.date)].append(l)
@@ -141,29 +140,23 @@ class DB:
             cols = {r["name"] for r in await cur.fetchall()}
         for col, ddl in (("banned", "INTEGER NOT NULL DEFAULT 0"), ("digest_mode", "TEXT"),
                          ("digest_time", "TEXT"), ("last_digest", "TEXT"),
-                         # ⭐ Premium
                          ("premium_until", "TEXT"), ("trial_used", "INTEGER NOT NULL DEFAULT 0"),
                          ("premium_warned", "TEXT"),
-                         # 🎨 оформление
                          ("theme", "TEXT"), ("accent", "TEXT"), ("bg", "TEXT"),
                          ("no_watermark", "INTEGER NOT NULL DEFAULT 0"), ("msg_style", "TEXT"),
                          ("emoji_set", "TEXT"),
-                         # ⏳ напоминания
                          ("remind_before", "INTEGER"), ("remind_first_only", "INTEGER NOT NULL DEFAULT 0"),
                          ("note_remind", "INTEGER NOT NULL DEFAULT 1"),
-                         # ⏰ рассылки: вечер / утро / неделя (время «20:00» или NULL)
                          ("digest_evening", "TEXT"), ("digest_morning", "TEXT"), ("digest_week", "TEXT"),
                          ("last_digest_e", "TEXT"), ("last_digest_m", "TEXT"), ("last_digest_w", "TEXT"),
-                         # 🤝 рефералка, 📱 виджет, 🖼 фото на фоне, 🏆 счётчики
                          ("referred_by", "INTEGER"), ("ref_rewarded", "INTEGER NOT NULL DEFAULT 0"),
                          ("widget_msg_id", "INTEGER"), ("widget_hash", "TEXT"),
                          ("bg_photo", "INTEGER NOT NULL DEFAULT 0"),
                          ("digests_sent", "INTEGER NOT NULL DEFAULT 0"),
-                         ("home_token", "TEXT"),  # 📲 секрет ссылки на виджет рабочего стола
-                         ("receipt_email", "TEXT")):  # 💳 почта для чеков ЮKassa
+                         ("home_token", "TEXT"),
+                         ("receipt_email", "TEXT")):
             if col not in cols:
                 await self.conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
-        # старая одиночная рассылка → новые слоты
         await self.conn.execute(
             "UPDATE users SET digest_evening = digest_time, last_digest_e = last_digest, digest_mode = NULL "
             "WHERE digest_mode = 'evening'")
@@ -174,7 +167,6 @@ class DB:
             ncols = {r["name"] for r in await cur.fetchall()}
         if "reminded" not in ncols:
             await self.conn.execute("ALTER TABLE notes ADD COLUMN reminded INTEGER NOT NULL DEFAULT 0")
-        # 💳 оплата в рублях через ЮKassa
         async with self.conn.execute("PRAGMA table_info(purchases)") as cur:
             pcols = {r["name"] for r in await cur.fetchall()}
         if "currency" not in pcols:
@@ -184,7 +176,6 @@ class DB:
         await self.conn.commit()
 
     async def _migrate_users(self) -> None:
-        """Переносит пользователей из старой таблицы (без имени/даты регистрации) в новую."""
         async with self.conn.execute("PRAGMA table_info(users)") as cur:
             cols = {r["name"] for r in await cur.fetchall()}
         if "registered_at" in cols:
@@ -203,7 +194,6 @@ class DB:
         )
         await self.conn.execute("DROP TABLE users_old")
 
-    # ---------- meta ----------
     async def get_meta(self, key: str) -> str | None:
         async with self.conn.execute("SELECT value FROM meta WHERE key = ?", (key,)) as cur:
             row = await cur.fetchone()
@@ -217,10 +207,7 @@ class DB:
         )
         await self.conn.commit()
 
-    # ---------- расписание ----------
     async def replace_snapshot(self, snap: Snapshot, today_iso: str):
-        """Обновляет расписание. Возвращает (changes, old_max_date), где
-        changes = {(вид, id, дата): (старые_пары, новые_пары)} — только сегодня и дальше."""
         async with self.conn.execute(
             "SELECT group_id, date, pair, time, subject, room_ids, rooms, teacher_ids, teachers "
             "FROM lessons WHERE date >= ?",
@@ -241,8 +228,6 @@ class DB:
             + [("t", i, n, norm(n)) for i, n in snap.teachers.items()]
             + [("r", i, n, norm(n)) for i, n in snap.rooms.items()]
         )
-        # прошлые дни, которых уже нет на сайте, оставляем (для истории и звонков),
-        # всё, что покрывает новая выгрузка, — перезаписываем
         min_new = min((l.date for l in snap.lessons), default=today_iso)
         await self.conn.execute("DELETE FROM lessons WHERE date >= ?", (min_new,))
         await self.conn.execute("DELETE FROM lessons WHERE date < date(?, '-120 days')", (today_iso,))
@@ -254,7 +239,6 @@ class DB:
             "INSERT INTO lessons VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             [astuple(l) for l in snap.lessons],
         )
-        # подтягиваем актуальные названия групп / ФИО преподов в таблицу пользователей
         await self.conn.execute(
             "UPDATE users SET target_name = (SELECT name FROM entities e "
             "WHERE e.kind = users.kind AND e.id = users.target_id) "
@@ -265,8 +249,6 @@ class DB:
         return changes, old_max
 
     async def bells(self, day_iso: str | None = None) -> dict[int, str]:
-        """Расписание звонков {номер пары: "8:00–9:20"} — самое частое время для каждой пары.
-        Если указан день, время этого дня важнее (например, сокращённая суббота)."""
         async def collect(where: str, params: tuple) -> dict[int, str]:
             async with self.conn.execute(
                 "SELECT pair, time, COUNT(*) AS c FROM lessons "
@@ -299,7 +281,6 @@ class DB:
             return [dict(r) for r in await cur.fetchall()]
 
     async def max_date(self) -> str | None:
-        """До какого дня на сайте выложено расписание."""
         async with self.conn.execute("SELECT MAX(date) AS d FROM lessons") as cur:
             row = await cur.fetchone()
         return row["d"] if row else None
@@ -312,7 +293,6 @@ class DB:
         return row["name"] if row else None
 
     async def search(self, query: str, kinds=("g", "t", "r"), limit: int = 24) -> list[tuple]:
-        """[(kind, id, name)] — сначала точные совпадения, потом начало, потом вхождение."""
         q = norm(query)
         if not q:
             return []
@@ -332,15 +312,12 @@ class DB:
         found.sort()
         return [(k, i, name) for _, _, name, k, i in found[:limit]]
 
-    # ---------- пользователи ----------
     async def get_user(self, uid: int) -> dict | None:
         async with self.conn.execute("SELECT * FROM users WHERE user_id = ?", (uid,)) as cur:
             row = await cur.fetchone()
         return dict(row) if row else None
 
     async def touch_user(self, uid: int, username: str | None, full_name: str | None) -> bool:
-        """Вызывается на каждое сообщение/нажатие: создаёт пользователя при первом контакте
-        (дата регистрации) и обновляет имя, юзернейм и время последнего визита."""
         now = self._now()
         await self.conn.execute(
             "INSERT INTO users(user_id, username, full_name, registered_at, last_seen) "
@@ -366,7 +343,6 @@ class DB:
         )
         await self.conn.commit()
 
-    # ---------- админка ----------
     async def stats(self) -> dict:
         today = self._now()[:10]
         async with self.conn.execute(
@@ -393,7 +369,6 @@ class DB:
             return [(str(r["name"]), r["c"]) for r in await cur.fetchall()]
 
     async def audience(self, kind: str | None = None, target_id: int | None = None) -> list[int]:
-        """ID получателей рассылки: всем / студентам / преподам / конкретной группе или преподу."""
         sql, params = "SELECT user_id FROM users WHERE banned = 0", []
         if kind:
             sql += " AND kind = ?"
@@ -405,12 +380,10 @@ class DB:
             return [r["user_id"] for r in await cur.fetchall()]
 
     async def find_users(self, query: str, limit: int = 10) -> list[dict]:
-        """Поиск по ID, @юзернейму, имени или группе/преподу."""
         q = query.strip().lstrip("@").lower()
         if q.isdigit():
             async with self.conn.execute("SELECT * FROM users WHERE user_id = ?", (int(q),)) as cur:
                 return [dict(r) for r in await cur.fetchall()]
-        # фильтруем в Python: SQLite lower() не понимает кириллицу
         async with self.conn.execute("SELECT * FROM users ORDER BY last_seen DESC") as cur:
             rows = [dict(r) for r in await cur.fetchall()]
         return [r for r in rows
@@ -437,7 +410,6 @@ class DB:
         ) as cur:
             return [r["user_id"] for r in await cur.fetchall()]
 
-    # ---------- авторассылка ----------
     async def set_digest(self, uid: int, mode: str | None, time_: str | None) -> None:
         await self.conn.execute(
             "UPDATE users SET digest_mode = ?, digest_time = ? WHERE user_id = ?", (mode, time_, uid))
@@ -454,9 +426,7 @@ class DB:
         await self.conn.execute("UPDATE users SET last_digest = ? WHERE user_id = ?", (today_iso, uid))
         await self.conn.commit()
 
-    # ---------- заметки ----------
     async def notes(self, uid: int, kind: str, eid: int, date_from: str, date_to: str) -> dict:
-        """{(дата, пара): текст}"""
         async with self.conn.execute(
             "SELECT date, pair, text FROM notes WHERE user_id = ? AND kind = ? AND target_id = ? "
             "AND date BETWEEN ? AND ?", (uid, kind, eid, date_from, date_to)
@@ -476,7 +446,6 @@ class DB:
             (uid, kind, eid, date_iso, pair))
         await self.conn.commit()
 
-    # ---------- аудитории ----------
     async def rooms(self) -> list[tuple[int, str]]:
         async with self.conn.execute("SELECT id, name FROM entities WHERE kind = 'r'") as cur:
             return [(r["id"], r["name"]) for r in await cur.fetchall()]
@@ -487,7 +456,6 @@ class DB:
         ) as cur:
             return {i for r in await cur.fetchall() for i in _ids(r["room_ids"])}
 
-    # ---------- обратная связь ----------
     async def add_feedback(self, uid: int, text: str) -> int:
         cur = await self.conn.execute(
             "INSERT INTO feedback(user_id, text, created_at) VALUES (?, ?, ?)", (uid, text, self._now()))
@@ -514,7 +482,6 @@ class DB:
         await self.conn.execute("UPDATE feedback SET answered = 1, answer = ? WHERE id = ?", (answer, fid))
         await self.conn.commit()
 
-    # ---------- журнал обновлений ----------
     async def log_update(self, ok: bool, forced: bool, lessons: int | None, changes: int | None,
                          duration_ms: int, error: str | None = None) -> None:
         await self.conn.execute(
@@ -532,22 +499,19 @@ class DB:
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
-    # ---------- бэкапы и импорт ----------
     async def close(self) -> None:
         if self.conn:
             await self.conn.close()
             self.conn = None
 
     async def backup_to(self, path: str) -> None:
-        """Целостная копия базы на лету (без остановки бота)."""
         await self.conn.commit()
         await self.conn.execute("VACUUM INTO ?", (path,))
 
     async def import_ids(self, ids: list[int]) -> tuple[int, int]:
-        """Добавляет пользователей по одним ID. Возвращает (добавлено, уже были)."""
         now = self._now()
         added = 0
-        for uid in dict.fromkeys(ids):  # без дублей, порядок сохраняем
+        for uid in dict.fromkeys(ids):
             cur = await self.conn.execute(
                 "INSERT OR IGNORE INTO users(user_id, registered_at, last_seen) VALUES (?, ?, NULL)",
                 (uid, now))
@@ -556,7 +520,6 @@ class DB:
         return added, len(dict.fromkeys(ids)) - added
 
     async def _upsert_imported(self, u: dict) -> str:
-        """'added' | 'updated' | 'skipped'. Существующих не затираем — только дополняем пустые поля."""
         if u.get("kind") and u.get("target_id") and not u.get("target_name"):
             u = {**u, "target_name": await self.entity_name(u["kind"], u["target_id"])}
         async with self.conn.execute("SELECT * FROM users WHERE user_id = ?", (u["user_id"],)) as cur:
@@ -579,7 +542,7 @@ class DB:
             if not row.get(f) and u.get(f):
                 patch[f] = u[f]
         if u.get("registered_at") and (not row["registered_at"] or u["registered_at"] < row["registered_at"]):
-            patch["registered_at"] = u["registered_at"]  # настоящая дата регистрации — более ранняя
+            patch["registered_at"] = u["registered_at"]
         if not patch:
             return "skipped"
         sets = ", ".join(f"{k} = ?" for k in patch)
@@ -590,7 +553,6 @@ class DB:
         stats = {"added": 0, "updated": 0, "skipped": 0}
         for u in users:
             stats[await self._upsert_imported(u)] += 1
-        # рассылка из старых бэкапов (одна колонка) → новые слоты
         await self.conn.execute("UPDATE users SET digest_evening = digest_time, digest_mode = NULL "
                                 "WHERE digest_mode = 'evening'")
         await self.conn.execute("UPDATE users SET digest_morning = digest_time, digest_mode = NULL "
@@ -599,7 +561,6 @@ class DB:
         return stats
 
     async def merge_from_db(self, path: str) -> dict:
-        """Переносит пользователей (и их заметки) из другого файла schedule.db."""
         async with aiosqlite.connect(path) as other:
             other.row_factory = aiosqlite.Row
             async with other.execute("SELECT name FROM sqlite_master WHERE type='table'") as cur:
@@ -623,7 +584,6 @@ class DB:
         return stats
 
     async def resolve_target(self, kind: str, name: str) -> int | None:
-        """«А-1» → ID группы с сайта (для импорта CSV, где есть только название)."""
         if not name:
             return None
         for _kind, eid, n in await self.search(name, kinds=(kind,)):
@@ -632,13 +592,11 @@ class DB:
         return None
 
     async def fill_profile(self, uid: int, username: str | None, full_name: str | None) -> None:
-        """Дописывает имя / юзернейм, только если их ещё нет."""
         await self.conn.execute(
             "UPDATE users SET username = COALESCE(username, ?), full_name = COALESCE(full_name, ?) "
             "WHERE user_id = ?", (username, full_name, uid))
         await self.conn.commit()
 
-    # ---------- ⭐ Premium ----------
     PREFS = {"theme", "accent", "bg", "no_watermark", "msg_style", "emoji_set", "remind_before",
              "remind_first_only", "note_remind", "digest_evening", "digest_morning", "digest_week",
              "widget_msg_id", "widget_hash", "bg_photo", "receipt_email"}
@@ -650,7 +608,6 @@ class DB:
         await self.conn.commit()
 
     async def extend_premium(self, uid: int, days: int | None) -> str:
-        """Продлевает Premium от текущей даты окончания (или от сейчас). days=None — навсегда."""
         from utils.premium import FOREVER
         if days is None:
             until = FOREVER
@@ -698,7 +655,6 @@ class DB:
             "FROM users", (now_s, FOREVER, now_s)
         ) as cur:
             row = dict(await cur.fetchone())
-        # Выручка отдельно по валютам: звёзды (total/month) и рубли (total_rub/month_rub)
         async with self.conn.execute(
             "SELECT COUNT(*) AS cnt, "
             "COALESCE(SUM(CASE WHEN currency = 'XTR' THEN stars END), 0) AS total, "
@@ -715,10 +671,8 @@ class DB:
             row["by_product"] = [dict(r) for r in await cur.fetchall()]
         return {k: (v or 0) if k != "by_product" else v for k, v in row.items()}
 
-    # покупки
     async def add_purchase(self, uid: int, product: str, stars: int, charge_id: str | None,
                            currency: str = "XTR", provider_charge_id: str | None = None) -> int:
-        """stars — сумма в валюте покупки: звёзды для XTR, рубли для RUB."""
         cur = await self.conn.execute(
             "INSERT INTO purchases(user_id, product, stars, charge_id, created_at, currency, provider_charge_id) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
@@ -738,7 +692,6 @@ class DB:
             row = await cur.fetchone()
         return dict(row) if row else None
 
-    # 💳 ожидающие платежи ЮKassa
     async def add_pending(self, pid: str, uid: int, product: str, amount: int, chat_id: int) -> None:
         await self.conn.execute(
             "INSERT OR IGNORE INTO pending_payments(id, user_id, product, amount, chat_id, created_at) "
@@ -755,7 +708,6 @@ class DB:
         return dict(row) if row else None
 
     async def finish_pending(self, pid: str, status: str) -> bool:
-        """Закрывает платёж. True — если он ещё был открыт (защита от двойной выдачи)."""
         cur = await self.conn.execute(
             "UPDATE pending_payments SET status = ? WHERE id = ? AND status = 'pending'", (status, pid))
         await self.conn.commit()
@@ -765,7 +717,6 @@ class DB:
         await self.conn.execute("UPDATE purchases SET refunded = 1 WHERE id = ?", (pid,))
         await self.conn.commit()
 
-    # темы
     async def owned_themes(self, uid: int) -> set[str]:
         async with self.conn.execute("SELECT theme FROM owned_themes WHERE user_id = ?", (uid,)) as cur:
             return {r["theme"] for r in await cur.fetchall()}
@@ -778,7 +729,6 @@ class DB:
         await self.conn.execute("DELETE FROM owned_themes WHERE user_id = ? AND theme = ?", (uid, theme))
         await self.conn.commit()
 
-    # избранное
     async def favorites(self, uid: int) -> list[tuple[str, int, str]]:
         async with self.conn.execute(
             "SELECT f.kind, f.target_id, COALESCE(e.name, '?') AS name FROM favorites f "
@@ -802,7 +752,6 @@ class DB:
                                 (uid, kind, eid))
         await self.conn.commit()
 
-    # промокоды
     async def create_promo(self, code: str, days: int, uses: int) -> None:
         await self.conn.execute("INSERT OR REPLACE INTO promos VALUES (?, ?, ?, ?)",
                                 (code.upper(), days, uses, self._now()))
@@ -820,7 +769,6 @@ class DB:
         await self.conn.commit()
 
     async def redeem_promo(self, uid: int, code: str) -> int | str:
-        """Возвращает число дней (0 = навсегда) или текст ошибки."""
         code = code.strip().upper()
         async with self.conn.execute("SELECT * FROM promos WHERE code = ?", (code,)) as cur:
             promo = await cur.fetchone()
@@ -837,7 +785,6 @@ class DB:
         await self.conn.commit()
         return promo["days"]
 
-    # заметки и напоминания
     async def count_future_notes(self, uid: int, today_iso: str) -> int:
         async with self.conn.execute(
             "SELECT COUNT(*) AS c FROM notes WHERE user_id = ? AND date >= ?", (uid, today_iso)
@@ -875,7 +822,6 @@ class DB:
         await self.conn.execute(f"UPDATE users SET {col} = ? WHERE user_id = ?", (today_iso, uid))
         await self.conn.commit()
 
-    # ---------- 🤝 рефералка ----------
     async def user_exists(self, uid: int) -> bool:
         async with self.conn.execute("SELECT 1 FROM users WHERE user_id = ?", (uid,)) as cur:
             return await cur.fetchone() is not None
@@ -886,7 +832,6 @@ class DB:
         await self.conn.commit()
 
     async def take_referral_reward(self, uid: int) -> int | None:
-        """Если пользователь пришёл по ссылке и бонус ещё не начислен — отмечает и возвращает ID пригласившего."""
         async with self.conn.execute(
             "SELECT referred_by FROM users WHERE user_id = ? AND referred_by IS NOT NULL AND ref_rewarded = 0",
             (uid,)
@@ -899,7 +844,6 @@ class DB:
         return row["referred_by"]
 
     async def referral_counts(self, uid: int) -> tuple[int, int]:
-        """(пришли по ссылке, выбрали группу — засчитаны)"""
         async with self.conn.execute(
             "SELECT COUNT(*) AS a, SUM(ref_rewarded) AS b FROM users WHERE referred_by = ?", (uid,)
         ) as cur:
@@ -914,7 +858,6 @@ class DB:
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
-    # ---------- 🎁 подарки ----------
     async def create_gift(self, code: str, plan: str, buyer: int) -> None:
         await self.conn.execute("INSERT INTO gifts(code, plan, buyer_id, created_at) VALUES (?, ?, ?, ?)",
                                 (code, plan, buyer, self._now()))
@@ -939,7 +882,6 @@ class DB:
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
-    # ---------- 🏆 достижения ----------
     async def achievements(self, uid: int) -> dict[str, str]:
         async with self.conn.execute("SELECT code, at FROM achievements WHERE user_id = ?", (uid,)) as cur:
             return {r["code"]: r["at"] for r in await cur.fetchall()}
@@ -975,7 +917,6 @@ class DB:
         await self.conn.execute("UPDATE users SET digests_sent = digests_sent + 1 WHERE user_id = ?", (uid,))
         await self.conn.commit()
 
-    # ---------- 📱 виджет ----------
     async def widget_users(self, now_s: str) -> list[dict]:
         async with self.conn.execute(
             "SELECT * FROM users WHERE widget_msg_id IS NOT NULL AND kind IS NOT NULL AND banned = 0 "
@@ -983,7 +924,6 @@ class DB:
         ) as cur:
             return [dict(r) for r in await cur.fetchall()]
 
-    # ---------- 📊 статистика фич ----------
     async def log_event(self, uid: int, name: str) -> None:
         await self.conn.execute("INSERT INTO events VALUES (?, ?, ?)", (self._now()[:10], uid, name))
         await self.conn.commit()
@@ -1012,7 +952,6 @@ class DB:
                 res[k] = (await cur.fetchone())[0] or 0
         return res
 
-    # ---------- 📈 графики ----------
     async def daily_series(self, since: str) -> dict:
         res = {}
         for key, sql in {
@@ -1032,7 +971,6 @@ class DB:
             res["base"] = (await cur.fetchone())[0] or 0
         return res
 
-    # ---------- 📲 виджет на рабочий стол ----------
     async def home_token(self, uid: int, reset: bool = False) -> str:
         import secrets
         user = await self.get_user(uid) or {}

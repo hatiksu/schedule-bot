@@ -1,10 +1,3 @@
-"""💳 Клиент API ЮKassa (https://yookassa.ru/developers/api): платёж по ссылке, статус и возврат.
-
-Почему не встроенные платежи Telegram: Telegram не принимает счета дешевле ~1 $, а нам нужны
-донаты от 1 ₽ и демократичные цены. Через API ЮKassa минимальная сумма — 1 ₽.
-
-Ключи — в личном кабинете ЮKassa → Интеграция → Ключи API (shopId и секретный ключ).
-"""
 from __future__ import annotations
 
 import uuid
@@ -22,8 +15,8 @@ class YooKassaError(Exception):
 @dataclass(frozen=True)
 class Payment:
     id: str
-    status: str            # pending | waiting_for_capture | succeeded | canceled
-    amount: int            # рубли
+    status: str
+    amount: int
     confirmation_url: str | None = None
 
 
@@ -33,7 +26,6 @@ def rub(amount: int) -> dict:
 
 def payment_body(amount: int, description: str, return_url: str, metadata: dict,
                  receipt: dict | None = None) -> dict:
-    """Тело запроса на создание платежа: сразу списываем (capture) и возвращаем пользователя в бота."""
     body = {
         "amount": rub(amount),
         "capture": True,
@@ -47,7 +39,6 @@ def payment_body(amount: int, description: str, return_url: str, metadata: dict,
 
 
 def receipt_for(description: str, amount: int, email: str, vat_code: int = 1) -> dict:
-    """Чек по 54-ФЗ: одна услуга с полной оплатой; чек уходит покупателю на почту."""
     clean = "".join(ch for ch in description if ch.isalnum() or ch in " «»:-.,").strip()[:128] or "Услуга"
     return {
         "customer": {"email": email},
@@ -103,6 +94,5 @@ class YooKassa:
         return _payment(await self._request("GET", f"/payments/{payment_id}"))
 
     async def refund(self, payment_id: str, amount: int) -> str:
-        """Возврат денег за платёж; возвращает статус возврата (succeeded / pending / canceled)."""
         data = await self._request("POST", "/refunds", {"payment_id": payment_id, "amount": rub(amount)})
         return data["status"]

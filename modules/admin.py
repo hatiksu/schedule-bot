@@ -1,9 +1,3 @@
-"""🛠 Админ-панель: /admin
-
-📊 Статистика · 🔄 Обновить расписание · 📢 Рассылка · 👤 Пользователи · 📥 Экспорт CSV
-
-Доступ — только ID из ADMIN_IDS (.env). db и run_update приходят из Dispatcher(...).
-"""
 from __future__ import annotations
 
 import asyncio
@@ -37,8 +31,8 @@ router.callback_query.filter(IsAdmin())
 
 
 class Broadcast(StatesGroup):
-    target_query = State()   # ввод группы / фамилии для адресной рассылки
-    content = State()        # ждём сообщение для рассылки
+    target_query = State()
+    content = State()
 
 
 class FindUser(StatesGroup):
@@ -57,7 +51,6 @@ BACK = [btn("◀️ В админку", "adm:home")]
 KIND_ICON = {"g": "👥", "t": "👤"}
 
 
-# ---------- главная ----------
 async def home_view(db: DB) -> tuple[str, InlineKeyboardMarkup]:
     s = await db.stats()
     last = await db.get_meta("last_update_at") or "—"
@@ -109,7 +102,6 @@ async def cb_home(c: CallbackQuery, state: FSMContext, db: DB):
     await c.answer()
 
 
-# ---------- статистика ----------
 @router.callback_query(F.data == "adm:stats")
 async def cb_stats(c: CallbackQuery, db: DB):
     s = await db.stats()
@@ -139,7 +131,6 @@ async def cb_stats(c: CallbackQuery, db: DB):
     await c.answer()
 
 
-# ---------- обновление расписания ----------
 @router.callback_query(F.data == "adm:update")
 async def cb_update(c: CallbackQuery, db: DB, run_update):
     await c.answer("Запускаю обновление…")
@@ -152,7 +143,6 @@ async def cb_update(c: CallbackQuery, db: DB, run_update):
     await c.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=[BACK]))
 
 
-# ---------- экспорт ----------
 @router.callback_query(F.data == "adm:export")
 async def cb_export(c: CallbackQuery, db: DB):
     users = await db.all_users()
@@ -165,13 +155,12 @@ async def cb_export(c: CallbackQuery, db: DB):
         u = dict(u)
         u["kind"] = {"g": "студент", "t": "преподаватель"}.get(u["kind"], "")
         w.writerow(u)
-    data = buf.getvalue().encode("utf-8-sig")  # BOM — чтобы Excel правильно открыл кириллицу
+    data = buf.getvalue().encode("utf-8-sig")
     await c.message.answer_document(BufferedInputFile(data, filename="users.csv"),
                                     caption=f"📥 Пользователей: <b>{len(users)}</b>")
     await c.answer()
 
 
-# ---------- пользователи ----------
 def user_card(u: dict) -> tuple[str, InlineKeyboardMarkup]:
     role = {"g": "🎓 студент", "t": "👨‍🏫 преподаватель"}.get(u["kind"], "❔ не выбрал")
     target = f"\n{KIND_ICON.get(u['kind'], '')} {escape(u['target_name'] or '—')}" if u["kind"] else ""
@@ -252,7 +241,6 @@ async def cb_ban(c: CallbackQuery, db: DB):
     await c.answer("🚫 Заблокирован" if action == "ban" else "✅ Разблокирован")
 
 
-# ---------- рассылка ----------
 @router.callback_query(F.data == "adm:bc")
 async def cb_bc(c: CallbackQuery, state: FSMContext, db: DB):
     await state.clear()
@@ -355,7 +343,6 @@ async def cb_bc_go(c: CallbackQuery, state: FSMContext, db: DB):
     users = await db.audience(data.get("kind"), data.get("target_id"))
     await c.answer("Рассылка запущена")
     progress = await c.message.edit_text(f"📤 Рассылка: 0 / {len(users)}")
-    # в фоне, чтобы бот не «зависал» на время рассылки
     asyncio.create_task(run_broadcast(c.bot, db, users, data["chat_id"], data["message_id"],
                                       progress, data["label"]))
 
@@ -375,7 +362,7 @@ async def run_broadcast(bot: Bot, db: DB, users: list[int], from_chat: int, msg_
             except TelegramAPIError:
                 failed += 1
         except TelegramForbiddenError:
-            blocked += 1  # пользователь удалил / заблокировал бота
+            blocked += 1
         except TelegramAPIError:
             failed += 1
         if i % 25 == 0:
@@ -383,7 +370,7 @@ async def run_broadcast(bot: Bot, db: DB, users: list[int], from_chat: int, msg_
                 await progress.edit_text(f"📤 Рассылка: {i} / {len(users)}")
             except TelegramAPIError:
                 pass
-        await asyncio.sleep(0.05)  # ~20 сообщений в секунду — в пределах лимитов Telegram
+        await asyncio.sleep(0.05)
     report = (
         f"✅ <b>Рассылка завершена</b> · {escape(label)}\n"
         "<blockquote>"
@@ -399,7 +386,6 @@ async def run_broadcast(bot: Bot, db: DB, users: list[int], from_chat: int, msg_
     log.info("Рассылка «%s»: доставлено %s, заблокировали %s, ошибок %s", label, sent, blocked, failed)
 
 
-# ---------- режим техработ ----------
 @router.callback_query(F.data == "adm:maint")
 async def cb_maint(c: CallbackQuery, db: DB):
     on = await db.get_meta("maintenance") != "1"
@@ -411,7 +397,6 @@ async def cb_maint(c: CallbackQuery, db: DB):
     await c.message.edit_text(text, reply_markup=kb)
 
 
-# ---------- журнал обновлений ----------
 @router.callback_query(F.data.startswith("adm:log:"))
 async def cb_log(c: CallbackQuery, db: DB):
     only_events = c.data.endswith("events")
@@ -441,7 +426,6 @@ async def cb_log(c: CallbackQuery, db: DB):
     await c.answer()
 
 
-# ---------- каникулы ----------
 DATE_RE = re.compile(r"(\d{1,2})\.(\d{1,2})\.(\d{4})")
 
 

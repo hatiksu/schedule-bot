@@ -1,4 +1,3 @@
-"""✉️ Обратная связь: пользователь пишет → админам приходит обращение → админ отвечает из бота."""
 from __future__ import annotations
 
 from html import escape
@@ -37,7 +36,6 @@ def _who(u: dict | None, uid: int) -> str:
     return f"<b>{name}</b>{uname}{target} · <code>{uid}</code>"
 
 
-# ---------- пользователь ----------
 async def _start(message: Message, state: FSMContext):
     await state.set_state(FeedbackState.text)
     await message.answer(
@@ -82,7 +80,6 @@ async def got_feedback(m: Message, state: FSMContext):
                    "<blockquote>Ответ придёт сюда, в этот чат.</blockquote>")
 
 
-# ---------- админ ----------
 @router.callback_query(F.data == "adm:fb", IsAdmin())
 async def cb_list(c: CallbackQuery, state: FSMContext):
     await state.clear()

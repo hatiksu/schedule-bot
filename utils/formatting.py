@@ -1,4 +1,3 @@
-"""Оформление сообщений: цитаты (<blockquote>), даты по-русски, «идёт сейчас», окна."""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -13,7 +12,6 @@ KIND_ICON = {"g": "👥", "t": "👤", "r": "🚪"}
 KIND_TITLE = {"g": "Группа", "t": "Преподаватель", "r": "Аудитория"}
 
 
-# ---------- даты и слова ----------
 def plural(n: int, one: str, few: str, many: str) -> str:
     if n % 10 == 1 and n % 100 != 11:
         return f"{n} {one}"
@@ -45,7 +43,6 @@ def week_start(d: date) -> date:
 
 
 def study_day(d: date, step: int = 1) -> date:
-    """Сдвиг на день с пропуском воскресенья."""
     d += timedelta(days=step)
     if d.weekday() == 6:
         d += timedelta(days=step)
@@ -74,9 +71,7 @@ def fmt_minutes(m: int) -> str:
     return f"{h} ч {mm} мин" if mm else f"{h} ч"
 
 
-# ---------- подготовка данных ----------
 def _merge(rows: list[dict]) -> list[dict]:
-    """У препода одна пара может идти сразу у нескольких групп — склеиваем."""
     merged: dict[tuple, dict] = {}
     for r in rows:
         key = (r["date"], r["pair"], r["subject"], r["rooms"], r["teachers"])
@@ -92,7 +87,6 @@ ICONS = {"subj": "📖", "room": "🚪", "teacher": "👤", "group": "👥", "da
 
 
 def _ic(icons: dict | None, key: str) -> str:
-    """Иконка с пробелом после неё (или пусто, если в наборе её нет)."""
     v = (icons or ICONS).get(key, "")
     return f"{v} " if v else ""
 
@@ -117,15 +111,12 @@ def _footer(updated: str | None) -> str:
     return f"<i>🕓 Обновлено на сайте: {escape(updated)}</i>" if updated else ""
 
 
-# ---------- день ----------
 def format_day(kind: str, name: str, d: date, rows: list[dict], now: datetime,
                updated: str | None, max_date: str | None,
                notes: dict[int, str] | None = None, extras: list[str] | None = None,
                style: str = "normal", icons: dict | None = None) -> str:
-    """notes — заметки {пара: текст}, extras — строки внизу (отсчёты),
-    style — normal | compact | detailed, icons — набор эмодзи (Premium)."""
     notes = notes or {}
-    ic = lambda k: _ic(icons, k)  # noqa: E731
+    ic = lambda k: _ic(icons, k)
     extra = ["", *extras] if extras else []
     today = now.date()
     items = _merge(rows)
@@ -148,7 +139,6 @@ def format_day(kind: str, name: str, d: date, rows: list[dict], now: datetime,
     head.append(f"<i>{summary}</i>")
     head.append("")
 
-    # что идёт сейчас / что следующее (только для сегодняшнего дня)
     status: dict[int, str] = {}
     all_done = False
     if d == today:
@@ -167,7 +157,7 @@ def format_day(kind: str, name: str, d: date, rows: list[dict], now: datetime,
         all_done = bool(last_t and t > last_t[1])
 
     body = []
-    if style == "compact":  # все пары одной цитатой, по строке на пару
+    if style == "compact":
         lines = []
         for i, r in enumerate(items):
             tt = _times(r["time"])
@@ -210,7 +200,6 @@ def format_day(kind: str, name: str, d: date, rows: list[dict], now: datetime,
     return "\n".join(head + body + tail + extra + ["", _footer(updated)]).strip()
 
 
-# ---------- неделя ----------
 def format_week(kind: str, name: str, monday: date, rows: list[dict], now: datetime,
                 updated: str | None, max_date: str | None,
                 notes: dict[tuple[str, int], str] | None = None, icons: dict | None = None) -> str:
@@ -263,7 +252,6 @@ def format_week(kind: str, name: str, monday: date, rows: list[dict], now: datet
     return "\n\n".join(b for b in blocks if b)
 
 
-# ---------- короткое описание дня (для inline-режима) ----------
 def day_summary(rows: list[dict]) -> str:
     items = _merge(rows)
     if not items:
@@ -275,7 +263,6 @@ def day_summary(rows: list[dict]) -> str:
     return s
 
 
-# ---------- звонки ----------
 def format_bells(bells: dict[int, str], d: date, now: datetime,
                  my_rows: list[dict] | None = None, kind: str | None = None) -> str:
     lines = [f"⏰ <b>Звонки</b> · {human_date(d)}", ""]
@@ -288,7 +275,6 @@ def format_bells(bells: dict[int, str], d: date, now: datetime,
     current = next((p for p in pairs if parsed[p][0] <= t <= parsed[p][1]), None)
     upcoming = next((p for p in pairs if t < parsed[p][0]), None)
 
-    # статус + таймер
     if d.weekday() == 6:
         lines.append("🌤 Сегодня воскресенье — пар нет")
     elif current is not None:
@@ -303,7 +289,6 @@ def format_bells(bells: dict[int, str], d: date, now: datetime,
     else:
         lines.append("🌙 Пары на сегодня закончились")
 
-    # что сейчас / дальше у самого пользователя
     if my_rows and d.weekday() != 6:
         mine = {r["pair"]: r for r in _merge(my_rows)}
         target = current if current in mine else None
@@ -336,9 +321,7 @@ def format_bells(bells: dict[int, str], d: date, now: datetime,
     return "\n".join(lines)
 
 
-# ---------- подробные изменения ----------
 def _describe(lessons: list, kind: str, group_names: dict[int, str]) -> dict[int, tuple[str, str]]:
-    """{пара: (описание, время)} — «Математика, 2-25» (у препода ещё и группы)."""
     by_pair: dict[int, dict[tuple, set]] = defaultdict(lambda: defaultdict(set))
     times: dict[int, str] = {}
     for l in lessons:
@@ -360,7 +343,6 @@ def _describe(lessons: list, kind: str, group_names: dict[int, str]) -> dict[int
 
 def format_changes(kind: str, name: str, changes: dict[str, tuple[list, list]],
                    old_max: str | None, group_names: dict[int, str]) -> tuple[str, str] | None:
-    """changes = {дата: (старые, новые)}. Возвращает (текст, первая_дата) или None."""
     blocks, new_days, shown = [], [], []
     for day in sorted(changes):
         old, new = changes[day]
@@ -395,12 +377,10 @@ def format_changes(kind: str, name: str, changes: dict[str, tuple[list, list]],
     return "\n\n".join(parts), min(shown)
 
 
-# ---------- отсчёты ----------
 def days_word(n: int) -> str:
     return plural(n, "день", "дня", "дней")
 
 
-# ---------- свободные аудитории ----------
 def _room_sort_key(name: str):
     parts = name.replace("–", "-").split("-", 1)
     num = "".join(ch for ch in parts[-1] if ch.isdigit())
@@ -414,7 +394,6 @@ def format_free_rooms(d: date, pair: int, time_: str | None, free: list[str], to
             + f"\n🕐 <b>{pair} пара</b>" + (f" · {time_}" if time_ else ""))
     if not free:
         return head + "\n\n<blockquote>😬 Свободных аудиторий нет</blockquote>"
-    # группируем по корпусу/этажу — по тому, что до дефиса («2-25» → корпус 2)
     groups: dict[str, list[str]] = defaultdict(list)
     for name in sorted(free, key=_room_sort_key):
         prefix = name.replace("–", "-").split("-", 1)[0] if "-" in name else "Другие"
@@ -428,7 +407,6 @@ def format_free_rooms(d: date, pair: int, time_: str | None, free: list[str], to
             "<i>Учитываются аудитории, которые встречаются в расписании.</i>")
 
 
-# ---------- где сейчас преподаватель ----------
 def format_where(name: str, now: datetime, today_rows: list[dict],
                  next_day: date | None, next_rows: list[dict]) -> str:
     t = now.time()
@@ -478,7 +456,6 @@ def format_where(name: str, now: datetime, today_rows: list[dict],
     return "\n".join(lines)
 
 
-# ---------- нагрузка ----------
 def format_workload(kind: str, name: str, label: str, d1: date, d2: date, rows: list[dict],
                     max_date: str | None) -> str:
     items = _merge(rows)
@@ -517,10 +494,7 @@ def format_workload(kind: str, name: str, label: str, d1: date, d2: date, rows: 
     return "\n".join(parts)
 
 
-# ---------- служебное ----------
 def split_text(text: str, limit: int = 4000) -> list[str]:
-    """Telegram режет сообщения длиннее 4096 — делим по пустым строкам
-    (цитаты внутри не содержат пустых строк, так что теги не разрываются)."""
     parts, cur = [], ""
     for block in text.split("\n\n"):
         candidate = f"{cur}\n\n{block}" if cur else block

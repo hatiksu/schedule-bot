@@ -1,11 +1,3 @@
-"""📲 Виджет на рабочем столе телефона (Premium).
-
-Бот поднимает маленький веб-сервер и по личной секретной ссылке отдаёт картинку с расписанием
-на сегодня (вечером — на завтра) в теме пользователя:
-    {PUBLIC_URL}/w/<token>.png?size=s|m|l
-iPhone показывает её через приложение Scriptable (готовый скрипт присылает бот),
-Android — через KWGT или любое приложение «картинка по ссылке».
-"""
 from __future__ import annotations
 
 import asyncio
@@ -32,7 +24,6 @@ router = Router(name="homewidget")
 _cache: dict[tuple, tuple[float, bytes]] = {}
 
 
-# ======================= картинка =======================
 def _message_png(title: str, text: str, size: str = "m") -> bytes:
     W, H = SIZES.get(size, SIZES["m"])
     img = Image.new("RGB", (W, H), (15, 17, 22))
@@ -48,7 +39,6 @@ def _message_png(title: str, text: str, size: str = "m") -> bytes:
 
 
 async def pick_day(user: dict):
-    """Какой день показывать: сегодня, а если пары уже закончились или их нет — ближайший день с парами."""
     n = now()
     kind, eid = user["kind"], user["target_id"]
     d = n.date()
@@ -80,8 +70,6 @@ def _plain(title: str, text: str) -> dict:
 
 
 async def widget_json(user: dict) -> dict:
-    """Короткие строки для виджетов экрана блокировки (iOS рисует их одним цветом).
-    timer — момент звонка; iPhone сам показывает живой обратный отсчёт до него."""
     n, d, label, rows = await pick_day(user)
     kind = user["kind"]
     items = _merge(rows)
@@ -93,7 +81,7 @@ async def widget_json(user: dict) -> dict:
         state, cur = "next", items[0]
     tt = _times(cur["time"])
     room = cur["rooms"] if cur["rooms"] and kind != "r" else ""
-    if kind != "g":  # у препода/аудитории полезнее видеть группу
+    if kind != "g":
         room = room or ", ".join(sorted({g for g in cur["groups"] if g}))
     start = f"{tt[0]:%H:%M}" if tt else ""
 
@@ -142,7 +130,7 @@ async def handle_png(request: web.Request) -> web.Response:
     elif not user.get("kind"):
         body = _message_png("Выбери группу", "Открой бота и нажми /start", size)
     else:
-        key = (token, size, int(time.time() // 60))  # не чаще раза в минуту на ссылку
+        key = (token, size, int(time.time() // 60))
         hit = _cache.get(key)
         if hit:
             body = hit[1]
@@ -175,13 +163,11 @@ async def start_server() -> None:
         log.warning("📲 Веб-сервер виджетов не запустился: %s", e)
 
 
-# ======================= бот =======================
 def _url(token: str, size: str = "m") -> str:
     return f"{PUBLIC_URL}/w/{token}.png?size={size}"
 
 
 def scriptable_code(token: str, name: str) -> str:
-    # метки __ИМЯ__ уникальны: в JS-коде есть ${BASE} и ${BOT}, их трогать нельзя
     return SCRIPT.replace("__NAME__", name).replace("__BASE__", f"{PUBLIC_URL}/w/{token}") \
         .replace("__BOT__", runtime["bot_username"] or "")
 

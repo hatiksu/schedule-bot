@@ -1,4 +1,3 @@
-"""🎁 Подарить Premium: покупаешь звёздами или картой — получаешь ссылку-подарок и отправляешь кому угодно."""
 from __future__ import annotations
 
 import secrets
@@ -53,7 +52,6 @@ async def cb_buy(c: CallbackQuery):
 
 
 async def after_purchase(bot: Bot, chat_id: int, uid: int, plan: str) -> None:
-    """Вызывается из shop после оплаты подарка (звёздами или рублями)."""
     code = secrets.token_urlsafe(9).replace("-", "x").replace("_", "y")
     await db.create_gift(code, plan, uid)
     link = gift_link(code)
@@ -68,7 +66,6 @@ async def after_purchase(bot: Bot, chat_id: int, uid: int, plan: str) -> None:
 
 
 async def redeem(m: Message, payload: str) -> bool:
-    """/start gift_КОД. Возвращает True, если это была ссылка-подарок (обработана)."""
     code = payload.removeprefix("gift_")
     gift = await db.get_gift(code)
     if not gift:

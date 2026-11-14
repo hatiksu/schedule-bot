@@ -1,4 +1,3 @@
-"""🏫 Свободные аудитории — сейчас или на любую пару любого дня."""
 from __future__ import annotations
 
 from datetime import date
@@ -18,7 +17,6 @@ async def _bells_parsed(d: date) -> dict[int, tuple]:
 
 
 async def _default_slot() -> tuple[date, int]:
-    """Текущая пара, если идёт; иначе ближайшая следующая; после пар — 1 пара следующего дня."""
     n = now()
     d = n.date()
     bells = await _bells_parsed(d)

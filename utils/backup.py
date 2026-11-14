@@ -1,4 +1,3 @@
-"""💾 Бэкапы базы: создание копий, ротация (храним последние N), восстановление."""
 from __future__ import annotations
 
 import shutil
@@ -18,7 +17,6 @@ def backup_dir() -> Path:
 
 
 def list_backups() -> list[Path]:
-    """Новые сверху."""
     return sorted(backup_dir().glob("schedule_*.db"), reverse=True)
 
 
@@ -31,11 +29,10 @@ def is_sqlite(path: Path) -> bool:
 
 
 async def make_backup(db: DB, tag: str = "auto") -> Path:
-    """tag: auto — ежедневный, manual — по кнопке, before-restore / before-import — страховочные."""
     stamp = datetime.now(TZ).strftime("%Y-%m-%d_%H-%M-%S")
     path = backup_dir() / f"schedule_{stamp}_{tag}.db"
     n = 2
-    while path.exists():  # два бэкапа в одну секунду
+    while path.exists():
         path = backup_dir() / f"schedule_{stamp}-{n}_{tag}.db"
         n += 1
     await db.backup_to(str(path))
@@ -44,14 +41,12 @@ async def make_backup(db: DB, tag: str = "auto") -> Path:
 
 
 def _rotate() -> None:
-    """Обычные копии храним BACKUP_KEEP штук; страховочные (before-…) не трогаем, их мало."""
     regular = [p for p in list_backups() if "_before-" not in p.stem]
     for old in regular[BACKUP_KEEP:]:
         old.unlink(missing_ok=True)
 
 
 async def restore(db: DB, source: Path) -> Path:
-    """Заменяет текущую базу файлом source. Перед этим сохраняет текущую — на случай ошибки."""
     if not is_sqlite(source):
         raise ValueError("это не файл базы SQLite")
     safety = await make_backup(db, "before-restore")
@@ -61,12 +56,11 @@ async def restore(db: DB, source: Path) -> Path:
     try:
         tmp.replace(DB_PATH)
     finally:
-        await db.connect()  # заодно догонит схему, если бэкап от старой версии бота
+        await db.connect()
     return safety
 
 
 def describe(path: Path) -> str:
-    """schedule_2026-10-25_03-00-00_auto.db → «25.10 03:00 · авто · 120 КБ»."""
     parts = path.stem.split("_")
     try:
         dt = datetime.strptime(f"{parts[1]} {parts[2][:8]}", "%Y-%m-%d %H-%M-%S")

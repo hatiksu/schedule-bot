@@ -1,8 +1,3 @@
-"""Демо-картинки для README и сайта-портфолио: расписание, неделя и виджеты на выдуманных данных.
-
-Запуск из папки проекта:  python -m scripts.render_demo
-Картинки сохраняются в docs/screenshots/.
-"""
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -17,7 +12,6 @@ from utils.widget_image import render_widget
 
 OUT = Path(__file__).resolve().parent.parent / "docs" / "screenshots"
 GROUP = "К-11"
-# Выдуманные пары — реальные данные пользователей и колледжа в демо не попадают
 LESSONS = [
     (1, "8:30–9:50", "Основы алгоритмизации и программирования", "2-25", "Смирнова А. В."),
     (2, "10:00–11:20", "Базы данных", "3-14", "Кузнецов Д. С."),
@@ -36,11 +30,10 @@ def rows_for(d: date, take: int = 4, shift: int = 0) -> list[dict]:
 
 
 def showcase(files: dict[str, bytes]) -> bytes:
-    """Витрина 1440×900 для сайта: три темы дня и виджет на градиентном фоне."""
     W, H = 1440, 900
     img = Image.new("RGB", (W, H))
     draw = ImageDraw.Draw(img)
-    for y in range(H):  # мягкий фиолетово-синий градиент
+    for y in range(H):
         k = y / H
         draw.line([(0, y), (W, y)], fill=(int(24 + 10 * k), int(18 + 14 * k), int(48 + 30 * k)))
     phones = ["day-classic.png", "day-neon.png", "day-pastel.png"]
@@ -65,7 +58,7 @@ def showcase(files: dict[str, bytes]) -> bytes:
 
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
-    today = date(2026, 11, 16)  # понедельник
+    today = date(2026, 11, 16)
     monday = today - timedelta(days=today.weekday())
     now = datetime(2026, 11, 16, 10, 30)
     day = rows_for(today)

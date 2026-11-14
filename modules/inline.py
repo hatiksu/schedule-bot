@@ -1,4 +1,3 @@
-"""💬 Inline-режим: «@бот К-11» в любом чате → расписание на сегодня / завтра / неделю."""
 from datetime import timedelta
 
 from aiogram import Router
@@ -17,7 +16,7 @@ async def inline_query(q: InlineQuery):
     text = q.query.strip()
     if text:
         found = await db.search(text, limit=5)
-    else:  # пустой запрос — своё расписание
+    else:
         user = await db.get_user(q.from_user.id)
         found = [(user["kind"], user["target_id"], await chosen_name(user))] if user and user["kind"] else []
     if not found:

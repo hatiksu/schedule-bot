@@ -1,4 +1,3 @@
-"""Бот расписания колледжа — точка входа. Вся логика в modules/, общее — в utils/."""
 import asyncio
 import logging
 

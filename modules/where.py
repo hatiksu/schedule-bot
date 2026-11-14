@@ -1,4 +1,3 @@
-"""📍 Где сейчас преподаватель: текущая пара, следующая, ближайший рабочий день."""
 from __future__ import annotations
 
 from datetime import timedelta
@@ -25,7 +24,6 @@ async def where_view(eid: int) -> tuple[str, InlineKeyboardMarkup]:
     today = n.date()
     name = await db.entity_name("t", eid) or "?"
     rows = await db.lessons("t", eid, today.isoformat(), today.isoformat())
-    # ближайший следующий день с парами (в пределах выложенного расписания)
     next_day, next_rows = None, []
     max_date = await db.max_date()
     d = today

@@ -1,5 +1,3 @@
-"""📱 Виджет дня (Premium): закреплённое сообщение в чате с ботом, которое само обновляется —
-что уже прошло, что идёт сейчас и сколько осталось, что дальше."""
 from __future__ import annotations
 
 import asyncio
@@ -21,7 +19,6 @@ router = Router(name="widget")
 
 
 def _round5(m: int) -> int:
-    """«ещё 23 мин» → «ещё 25 мин»: меньше правок сообщения, а точность та же."""
     return max(5, (m + 4) // 5 * 5)
 
 
@@ -52,7 +49,7 @@ async def widget_text(user: dict, n: datetime) -> str:
         status = "🌤 Сегодня выходной" if d.weekday() == 6 else "😌 Сегодня пар нет"
     body = f"\n<blockquote>{chr(10).join(lines)}</blockquote>" if lines else ""
     tail = ""
-    if not items or status.startswith("🌙"):  # день закончился — показываем завтра
+    if not items or status.startswith("🌙"):
         nd = study_day(d, 1)
         nitems = _merge(await db.lessons(kind, eid, nd.isoformat(), nd.isoformat()))
         if nitems:
@@ -144,7 +141,7 @@ async def loop(bot: Bot) -> None:
                 except TelegramBadRequest as e:
                     if "not modified" in str(e):
                         await db.set_pref(user["user_id"], "widget_hash", h)
-                    else:  # сообщение удалили — выключаем виджет
+                    else:
                         await db.set_pref(user["user_id"], "widget_msg_id", None)
                 except TelegramAPIError:
                     await db.set_pref(user["user_id"], "widget_msg_id", None)

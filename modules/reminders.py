@@ -1,4 +1,3 @@
-"""⏳ Напоминания (Premium): за N минут до пары и утром — о заметках на сегодня."""
 from __future__ import annotations
 
 import asyncio
@@ -16,7 +15,7 @@ from utils.premium import PAYWALL_KB, icons_for, is_premium, paywall
 
 router = Router(name="reminders")
 OPTIONS = [5, 10, 15, 30]
-NOTE_TIME = (7, 0)  # во сколько напоминать о заметках на сегодня
+NOTE_TIME = (7, 0)
 
 
 async def menu_view(uid: int) -> tuple[str, InlineKeyboardMarkup]:
@@ -72,8 +71,7 @@ async def cb_set(c: CallbackQuery):
     await c.answer("Сохранено")
 
 
-# ---------- фоновая отправка ----------
-_sent: set[tuple] = set()  # (user, дата, пара) — чтобы не напомнить дважды
+_sent: set[tuple] = set()
 
 
 async def _pair_reminders(bot: Bot, n: datetime) -> None:
@@ -95,7 +93,7 @@ async def _pair_reminders(bot: Bot, n: datetime) -> None:
                 continue
             _sent.add(mark)
             icons = icons_for(user)
-            ic = lambda k, icons=icons: f"{icons.get(k)} " if icons.get(k) else ""  # noqa: E731
+            ic = lambda k, icons=icons: f"{icons.get(k)} " if icons.get(k) else ""
             meta = []
             if r["rooms"] and user["kind"] != "r":
                 meta.append(f"{ic('room')}<b>{escape(r['rooms'])}</b>")

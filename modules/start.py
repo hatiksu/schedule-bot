@@ -1,4 +1,3 @@
-"""👋 /start, /help и первый выбор: студент (группа) или преподаватель (фамилия)."""
 from html import escape
 
 from aiogram import F, Router
@@ -48,12 +47,12 @@ class Setup(StatesGroup):
 async def cmd_start(m: Message, state: FSMContext, command: CommandObject, is_new_user: bool = False):
     await state.clear()
     payload = (command.args or "").strip()
-    if payload.startswith("gift_"):      # 🎁 ссылка-подарок
+    if payload.startswith("gift_"):
         await gifts.redeem(m, payload)
-    elif payload.startswith("ref_"):     # 🤝 пришёл по приглашению
+    elif payload.startswith("ref_"):
         await referral.remember_inviter(m.from_user.id, payload, is_new_user)
     user = await db.get_user(m.from_user.id)
-    if user and user["kind"]:  # уже выбирал — не спрашиваем заново
+    if user and user["kind"]:
         who = "Группа" if user["kind"] == "g" else "Преподаватель"
         await m.answer(
             "👋 <b>С возвращением!</b>\n\n"

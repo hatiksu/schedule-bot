@@ -1,5 +1,3 @@
-"""Мидлварь: сохраняет пользователя в БД, не пускает заблокированных, включает заглушку техработ,
-пишет 📊 статистику фич и раз в день проверяет 🏆 достижения."""
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, InlineQuery, InlineQueryResultsButton, Message
 
@@ -18,7 +16,7 @@ CALLBACK_EVENTS = {
 }
 BUTTON_EVENTS = {BTN_SEARCH: "search", BTN_ROOMS: "rooms", BTN_BELLS: "bells", BTN_WHERE: "where",
                  BTN_LOAD: "workload", BTN_SETTINGS: "settings"}
-_checked: dict[int, str] = {}  # кому сегодня уже проверяли достижения
+_checked: dict[int, str] = {}
 
 
 def event_name(event) -> str | None:
@@ -40,9 +38,6 @@ def event_name(event) -> str | None:
     return None
 
 
-# Режимы «жду ввода» и кнопки, которые к ним относятся. Любое другое действие
-# (команда /…, кнопка меню внизу, кнопка из другого раздела) выходит из режима,
-# чтобы следующий текст не попал не туда — например, в заметку или в поиск препода.
 FLOW_CALLBACKS = {
     "Setup": ("role:", "set:"),
     "Search": (),
@@ -54,7 +49,7 @@ FLOW_CALLBACKS = {
     "PromoState": ("pm:promo",),
     "PhotoState": ("ap:photo",),
     "FindUser": ("adm:find", "adm:user:"),
-    "Broadcast": ("adm:bc",),            # adm:bc:…, adm:bct:… — шаги рассылки
+    "Broadcast": ("adm:bc",),
     "HolidayState": ("adm:hol",),
     "PromoCreate": ("pa:pnew",),
     "ImportState": ("bk:imp", "bk:mg", "bk:rp"),
@@ -79,12 +74,12 @@ class UserMiddleware(BaseMiddleware):
             return await handler(event, data)
         banned = False
         try:
-            data["is_new_user"] = not await db.user_exists(u.id)  # нужно рефералке
+            data["is_new_user"] = not await db.user_exists(u.id)
             banned = await db.touch_user(u.id, u.username, u.full_name)
         except Exception:
             log.exception("Не удалось сохранить пользователя %s", u.id)
         if isinstance(event, Message) and event.successful_payment:
-            return await handler(event, data)  # оплату засчитываем всегда, даже в техработы
+            return await handler(event, data)
         if u.id not in ADMIN_IDS:
             if banned:
                 if isinstance(event, CallbackQuery):
@@ -113,7 +108,7 @@ class UserMiddleware(BaseMiddleware):
             today = now().date().isoformat()
             if _checked.get(u.id) != today:
                 _checked[u.id] = today
-                from modules.achievements import check  # здесь, чтобы не было циклического импорта
+                from modules.achievements import check
                 await check(data["bot"], u.id)
         except Exception:
             log.exception("Статистика / достижения")

@@ -1,4 +1,3 @@
-"""📊 Статистика фич и 📈 графики роста пользователей, активности и выручки (админка)."""
 from __future__ import annotations
 
 import asyncio
@@ -86,7 +85,7 @@ async def cb_charts(c: CallbackQuery):
                           bars=stars, bar_color=(255, 210, 63), bar_name="звёзд за день"),
     ]
     names = ["users", "activity", "revenue"]
-    if sum(rub):  # 💳 продажи через ЮKassa — отдельный график
+    if sum(rub):
         jobs.append(asyncio.to_thread(chart, "Выручка в рублях", f"за 30 дней {sum(rub)} ₽", labels,
                                       bars=rub, bar_color=(61, 220, 132), bar_name="₽ за день"))
         names.append("revenue-rub")
