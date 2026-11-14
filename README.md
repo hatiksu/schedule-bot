@@ -3,6 +3,8 @@
 Telegram-бот, который знает расписание ВГЭК: забирает его с сайта «Экспресс-расписания», присылает замены,
 рисует расписание картинкой и показывает пары прямо на экране телефона.
 
+**Попробовать:** [@VGEKScheduleBot](https://t.me/VGEKScheduleBot)
+
 **Стек:** Python 3.11+ · aiogram 3 · SQLite (aiosqlite) · httpx + BeautifulSoup · Pillow · aiohttp · Telegram Stars
 
 ![Расписание картинкой в разных темах и виджет](docs/screenshots/showcase.png)

@@ -9,6 +9,7 @@
     "Монетизация через Telegram Stars: Premium, промокоды, подарки, рефералы; админка с графиками и автобэкапами"
   ],
   "code": "https://github.com/hatiksu/schedule-bot",
+  "telegram": "https://t.me/VGEKScheduleBot",
   "mockup": "generic",
   "icon": "📅",
   "order": 3,
