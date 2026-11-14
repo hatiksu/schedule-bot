@@ -1,0 +1,15 @@
+# Секреты и данные пользователей — никогда в репозиторий
+.env
+*.db
+*.db-journal
+backups/
+data/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+.local/
+.pytest_cache/
+.ruff_cache/

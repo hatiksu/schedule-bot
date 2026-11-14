@@ -1,0 +1,25 @@
+{
+  "$comment": "Карточка проекта для сайта-портфолио hatiksu.github.io. Сайт сам находит этот файл и показывает проект.",
+  "title": "Бот расписания колледжа",
+  "description": "Telegram-бот с расписанием ВГЭК: сам забирает его с сайта, присылает замены и напоминания, рисует расписание картинкой и показывает пары виджетом на экране телефона. Premium за Telegram Stars.",
+  "tags": ["Python", "aiogram 3", "SQLite", "Pillow", "Telegram Stars", "Парсинг"],
+  "highlights": [
+    "Парсер сайта колледжа и уведомления о заменах: бот каждые 30 минут сам проверяет расписание и пишет, что поменялось",
+    "Расписание картинкой в 8 темах и виджет на рабочий стол телефона — всё рисуется на Pillow",
+    "Монетизация через Telegram Stars: Premium, промокоды, подарки, рефералы; админка с графиками и автобэкапами"
+  ],
+  "code": "https://github.com/hatiksu/schedule-bot",
+  "mockup": "generic",
+  "icon": "📅",
+  "order": 3,
+  "screenshots": { "desktop": "docs/screenshots/showcase.png", "mobile": "docs/screenshots/day-classic.png" },
+  "en": {
+    "title": "College schedule bot",
+    "description": "A Telegram bot for the college timetable: it scrapes the schedule from the college website, sends change alerts and reminders, renders the schedule as images and shows classes in a home-screen widget. Premium via Telegram Stars.",
+    "highlights": [
+      "Website scraper with change alerts: every 30 minutes the bot checks the timetable and reports what changed",
+      "Schedule images in 8 themes and a phone home-screen widget — all rendered with Pillow",
+      "Monetisation with Telegram Stars: Premium, promo codes, gifts, referrals; admin panel with charts and auto-backups"
+    ]
+  }
+}
