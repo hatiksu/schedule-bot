@@ -5,7 +5,7 @@ import secrets
 from html import escape
 from urllib.parse import quote
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, Message
 
@@ -48,17 +48,18 @@ async def cb_buy(c: CallbackQuery):
     if plan not in PLANS:
         await c.answer()
         return
-    await send_invoice(c.message, f"gift:{plan}")
+    await send_invoice(c.message, f"gift:{plan}", uid=c.from_user.id)
     await c.answer()
 
 
-async def after_purchase(m: Message, plan: str) -> None:
-    """Вызывается из shop после оплаты подарка."""
+async def after_purchase(bot: Bot, chat_id: int, uid: int, plan: str) -> None:
+    """Вызывается из shop после оплаты подарка (звёздами или рублями)."""
     code = secrets.token_urlsafe(9).replace("-", "x").replace("_", "y")
-    await db.create_gift(code, plan, m.from_user.id)
+    await db.create_gift(code, plan, uid)
     link = gift_link(code)
     share = f"https://t.me/share/url?url={quote(link)}&text={quote('Держи подарок — Premium в боте расписания 🎁')}"
-    await m.answer(
+    await bot.send_message(
+        chat_id,
         f"🎁 <b>Подарок готов!</b>\n<blockquote>{PLANS[plan][0]}</blockquote>\n\n"
         f"Отправь эту ссылку тому, кому даришь:\n<code>{link}</code>\n\n"
         "<i>Ссылка одноразовая — сработает у первого, кто её откроет.</i>",

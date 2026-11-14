@@ -22,10 +22,11 @@ DATA_DIR = os.getenv("DATA_DIR", "data")                   # фото на фо�
 ALERT_AFTER = int(os.getenv("ALERT_AFTER", "3"))          # после скольких неудачных проверок сайта писать админу
 REF_BONUS_DAYS = int(os.getenv("REF_BONUS_DAYS", "7"))    # дней Premium за приглашённого друга
 
-# --- 💳 оплата картой и СБП через ЮKassa (Telegram Payments) ---
-# Токен провайдера: @BotFather → бот → Payments → ЮKassa. Пусто — оплата только звёздами.
-YOOKASSA_TOKEN = os.getenv("YOOKASSA_PROVIDER_TOKEN", "").strip()
-# Чек по 54-ФЗ: 1 — передавать в ЮKassa данные чека (нужно ИП/ООО с онлайн-кассой ЮKassa).
+# --- 💳 оплата картой, СБП и ЮMoney через API ЮKassa (от 1 ₽) ---
+# Личный кабинет ЮKassa → Интеграция → Ключи API. Пусто — оплата только звёздами.
+YOOKASSA_SHOP_ID = os.getenv("YOOKASSA_SHOP_ID", "").strip()
+YOOKASSA_SECRET_KEY = os.getenv("YOOKASSA_SECRET_KEY", "").strip()
+# Чек по 54-ФЗ: 1 — передавать данные чека (ИП/ООО с онлайн-кассой ЮKassa; бот спросит почту для чека).
 # Самозанятым с «Чеками от ЮKassa» оставить 0 — чек в «Мой налог» сформируется сам.
 YOOKASSA_RECEIPT = os.getenv("YOOKASSA_RECEIPT", "0") == "1"
 YOOKASSA_VAT_CODE = int(os.getenv("YOOKASSA_VAT_CODE", "1"))  # 1 — без НДС

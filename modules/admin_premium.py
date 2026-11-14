@@ -4,6 +4,7 @@ from __future__ import annotations
 import re
 from html import escape
 
+import httpx
 from aiogram import F, Router
 from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.context import FSMContext
@@ -14,6 +15,7 @@ from modules.appearance import show
 from utils.core import btn, db, now
 from utils.filters import IsAdmin
 from utils.premium import PLANS, RUB, THEMES, fmt_price, status_text
+from utils.yookassa import YooKassaError
 
 router = Router(name="admin_premium")
 router.message.filter(IsAdmin())
@@ -92,10 +94,7 @@ async def cb_refund_ask(c: CallbackQuery):
         return
     amount = fmt_price(p["stars"], p.get("currency") or "XTR")
     if p.get("currency") == RUB:
-        # Рубли Telegram вернуть не может — возврат делается в личном кабинете ЮKassa
-        note = ("Сначала верни деньги в личном кабинете ЮKassa → Платежи"
-                + (f" (платёж <code>{escape(p['provider_charge_id'])}</code>)" if p.get("provider_charge_id") else "")
-                + ", потом нажми «Да» — я заберу купленное и напишу покупателю.")
+        note = "Деньги вернутся на карту через ЮKassa, купленное заберу."
     else:
         note = "Звёзды вернутся покупателю, купленное заберу."
     await show(c, f"↩️ Вернуть <b>{amount}</b> за «{product_name(p['product'])}» (#{p['id']})?\n"
@@ -112,7 +111,17 @@ async def cb_refund(c: CallbackQuery):
         await c.answer("Возврат уже сделан или невозможен", show_alert=True)
         return
     is_rub = p.get("currency") == RUB
-    if not is_rub:
+    if is_rub:
+        from modules.shop import yookassa
+        try:
+            status = await yookassa.refund(p["provider_charge_id"] or p["charge_id"], p["stars"])
+        except (YooKassaError, httpx.HTTPError) as e:
+            await c.answer(f"ЮKassa не дала вернуть: {e}"[:190], show_alert=True)
+            return
+        if status == "canceled":
+            await c.answer("ЮKassa отклонила возврат — проверь в личном кабинете", show_alert=True)
+            return
+    else:
         try:
             await c.bot.refund_star_payment(user_id=p["user_id"], telegram_payment_charge_id=p["charge_id"])
         except TelegramAPIError as e:

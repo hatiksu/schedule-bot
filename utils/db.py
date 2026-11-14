@@ -48,6 +48,15 @@ CREATE TABLE IF NOT EXISTS purchases (
     currency   TEXT NOT NULL DEFAULT 'XTR',
     provider_charge_id TEXT          -- id платежа в ЮKassa (для возврата рублей в личном кабинете)
 );
+CREATE TABLE IF NOT EXISTS pending_payments (   -- 💳 платежи ЮKassa, которые ещё не оплачены
+    id         TEXT PRIMARY KEY,                    -- id платежа в ЮKassa
+    user_id    INTEGER,
+    product    TEXT,
+    amount     INTEGER,                             -- рубли
+    chat_id    INTEGER,
+    created_at TEXT,
+    status     TEXT NOT NULL DEFAULT 'pending'      -- pending | succeeded | canceled | expired
+);
 CREATE TABLE IF NOT EXISTS owned_themes (user_id INTEGER, theme TEXT, PRIMARY KEY (user_id, theme));
 CREATE TABLE IF NOT EXISTS favorites (
     user_id INTEGER, kind TEXT, target_id INTEGER, added_at TEXT,
@@ -150,7 +159,8 @@ class DB:
                          ("widget_msg_id", "INTEGER"), ("widget_hash", "TEXT"),
                          ("bg_photo", "INTEGER NOT NULL DEFAULT 0"),
                          ("digests_sent", "INTEGER NOT NULL DEFAULT 0"),
-                         ("home_token", "TEXT")):  # 📲 секрет ссылки на виджет рабочего стола
+                         ("home_token", "TEXT"),  # 📲 секрет ссылки на виджет рабочего стола
+                         ("receipt_email", "TEXT")):  # 💳 почта для чеков ЮKassa
             if col not in cols:
                 await self.conn.execute(f"ALTER TABLE users ADD COLUMN {col} {ddl}")
         # старая одиночная рассылка → новые слоты
@@ -631,7 +641,7 @@ class DB:
     # ---------- ⭐ Premium ----------
     PREFS = {"theme", "accent", "bg", "no_watermark", "msg_style", "emoji_set", "remind_before",
              "remind_first_only", "note_remind", "digest_evening", "digest_morning", "digest_week",
-             "widget_msg_id", "widget_hash", "bg_photo"}
+             "widget_msg_id", "widget_hash", "bg_photo", "receipt_email"}
 
     async def set_pref(self, uid: int, field: str, value) -> None:
         if field not in self.PREFS:
@@ -727,6 +737,29 @@ class DB:
         async with self.conn.execute("SELECT * FROM purchases WHERE id = ?", (pid,)) as cur:
             row = await cur.fetchone()
         return dict(row) if row else None
+
+    # 💳 ожидающие платежи ЮKassa
+    async def add_pending(self, pid: str, uid: int, product: str, amount: int, chat_id: int) -> None:
+        await self.conn.execute(
+            "INSERT OR IGNORE INTO pending_payments(id, user_id, product, amount, chat_id, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?)", (pid, uid, product, amount, chat_id, self._now()))
+        await self.conn.commit()
+
+    async def pending_payments(self) -> list[dict]:
+        async with self.conn.execute("SELECT * FROM pending_payments WHERE status = 'pending' ORDER BY created_at") as cur:
+            return [dict(r) for r in await cur.fetchall()]
+
+    async def get_pending(self, pid: str) -> dict | None:
+        async with self.conn.execute("SELECT * FROM pending_payments WHERE id = ?", (pid,)) as cur:
+            row = await cur.fetchone()
+        return dict(row) if row else None
+
+    async def finish_pending(self, pid: str, status: str) -> bool:
+        """Закрывает платёж. True — если он ещё был открыт (защита от двойной выдачи)."""
+        cur = await self.conn.execute(
+            "UPDATE pending_payments SET status = ? WHERE id = ? AND status = 'pending'", (status, pid))
+        await self.conn.commit()
+        return cur.rowcount > 0
 
     async def mark_refunded(self, pid: int) -> None:
         await self.conn.execute("UPDATE purchases SET refunded = 1 WHERE id = ?", (pid,))

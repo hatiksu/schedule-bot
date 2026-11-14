@@ -61,5 +61,6 @@ async def on_startup(bot: Bot) -> None:
     _tasks.append(asyncio.create_task(backup.loop(bot)))    # 💾 ежедневный бэкап
     _tasks.append(asyncio.create_task(reminders.loop(bot)))  # ⏳ напоминания
     _tasks.append(asyncio.create_task(shop.loop(bot)))      # ⭐ «Premium скоро закончится»
+    _tasks.append(asyncio.create_task(shop.payments_loop(bot)))  # 💳 проверка оплат ЮKassa
     _tasks.append(asyncio.create_task(widget.loop(bot)))    # 📱 обновление виджетов
     await homewidget.start_server()                         # 📲 картинки для виджетов на экран

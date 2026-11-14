@@ -1,4 +1,4 @@
-"""⭐ Premium: товары, цены в Telegram Stars и рублях (ЮKassa), темы, проверки доступа."""
+"""⭐ Premium: товары, цены в Telegram Stars и рублях (API ЮKassa, от 1 ₽), темы, проверки доступа."""
 from __future__ import annotations
 
 from datetime import datetime
@@ -12,29 +12,31 @@ FAV_LIMIT = 10
 
 # id: (название, звёзды, дней; None = навсегда)
 PLANS = {
-    "month": ("⭐ Premium на месяц", 30, 30),
-    "year": ("⭐ Premium на год", 200, 365),
-    "forever": ("👑 Premium навсегда", 350, None),
+    "month": ("⭐ Premium на месяц", 15, 30),
+    "year": ("⭐ Premium на год", 99, 365),
+    "forever": ("👑 Premium навсегда", 199, None),
 }
-DONATES = [10, 25, 50, 100, 250, 500]
+# Донат — любая сумма от 1; это только быстрые кнопки
+DONATES = [1, 5, 10, 25, 50, 100]
+DONATE_MIN = 1
 
-# --- 💳 цены в рублях (оплата картой / СБП через ЮKassa) ---
+# --- 💳 цены в рублях (карта / СБП / ЮMoney через API ЮKassa) ---
 STARS = "XTR"
 RUB = "RUB"
-RUB_PLANS = {"month": 79, "year": 490, "forever": 890}
-RUB_THEMES = {"neon": 39, "pastel": 39, "anime": 49, "minimal": 29, "notebook": 39, "newyear": 29, "halloween": 29}
-RUB_DONATES = [50, 100, 200, 500, 1000]
+RUB_PLANS = {"month": 29, "year": 199, "forever": 399}
+RUB_THEMES = {"neon": 19, "pastel": 19, "anime": 29, "minimal": 9, "notebook": 19, "newyear": 9, "halloween": 9}
+RUB_DONATES = [1, 10, 50, 100, 300, 1000]
 
 # id: (название, эмодзи, цена отдельно; 0 — бесплатно для всех)
 THEMES = {
     "classic": ("Классика", "🌌", 0),
-    "neon": ("Неон", "💜", 20),
-    "pastel": ("Пастель", "🍬", 20),
-    "anime": ("Сакура", "🌸", 25),
-    "minimal": ("Минимализм", "⚪", 15),
-    "notebook": ("Тетрадка", "📓", 20),
-    "newyear": ("Новогодняя", "🎄", 15),
-    "halloween": ("Хэллоуин", "🎃", 15),
+    "neon": ("Неон", "💜", 10),
+    "pastel": ("Пастель", "🍬", 10),
+    "anime": ("Сакура", "🌸", 15),
+    "minimal": ("Минимализм", "⚪", 5),
+    "notebook": ("Тетрадка", "📓", 10),
+    "newyear": ("Новогодняя", "🎄", 5),
+    "halloween": ("Хэллоуин", "🎃", 5),
 }
 ACCENTS = {
     "blue": ("Синий", "#638CFF"), "violet": ("Фиолетовый", "#A86EFF"), "pink": ("Розовый", "#FF5FA2"),
@@ -79,14 +81,14 @@ def price(product: str, currency: str = STARS) -> int | None:
             return PLANS[value][1]
         if kind == "theme" and value in THEMES and THEMES[value][2] > 0:
             return THEMES[value][2]
-        if kind == "donate" and value.isdigit() and int(value) in DONATES:
+        if kind == "donate" and value.isdigit() and int(value) >= DONATE_MIN:
             return int(value)
     elif currency == RUB:
         if kind in ("plan", "gift") and value in RUB_PLANS:
             return RUB_PLANS[value]
         if kind == "theme" and value in RUB_THEMES:
             return RUB_THEMES[value]
-        if kind == "donate" and value.isdigit() and int(value) in RUB_DONATES:
+        if kind == "donate" and value.isdigit() and int(value) >= DONATE_MIN:
             return int(value)
     return None
 
@@ -96,7 +98,7 @@ def fmt_price(amount: int, currency: str = STARS) -> str:
 
 
 def price_label(product: str, rub: bool) -> str:
-    """«30 ⭐» или «30 ⭐ / 79 ₽» — для кнопок, когда включена оплата картой."""
+    """«15 ⭐» или «15 ⭐ / 29 ₽» — для кнопок, когда включена оплата в рублях."""
     stars, rubles = price(product, STARS), price(product, RUB)
     parts = [fmt_price(stars)] if stars else []
     if rub and rubles:
@@ -120,20 +122,6 @@ def product_title(product: str) -> tuple[str, str]:
     if kind == "donate":
         return "💝 Поддержка бота", "Спасибо, что помогаешь боту жить!"
     return product, product
-
-
-def receipt(product: str, rubles: int, vat_code: int = 1) -> dict:
-    """Данные чека для ЮKassa (provider_data): одна позиция — услуга с полной оплатой."""
-    title, _ = product_title(product)
-    description = "".join(ch for ch in title if ch.isalnum() or ch in " «»:-.,").strip()[:128] or "Premium"
-    return {"receipt": {"items": [{
-        "description": description,
-        "quantity": "1.00",
-        "amount": {"value": f"{rubles}.00", "currency": RUB},
-        "vat_code": vat_code,
-        "payment_mode": "full_payment",
-        "payment_subject": "service",
-    }]}}
 
 
 def _now_str() -> str:
@@ -178,8 +166,8 @@ PAYWALL_KB = InlineKeyboardMarkup(inline_keyboard=[[
 
 
 def paywall(feature: str) -> str:
-    from config import YOOKASSA_TOKEN
-    cost = price_label("plan:month", bool(YOOKASSA_TOKEN)).replace(" / ", "</b> или <b>")
+    from config import YOOKASSA_SECRET_KEY, YOOKASSA_SHOP_ID
+    cost = price_label("plan:month", bool(YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY)).replace(" / ", "</b> или <b>")
     return (f"⭐ <b>{feature}</b> — функция Premium\n\n"
             f"<blockquote>{FEATURES}</blockquote>\n\n"
             f"От <b>{cost}</b> в месяц. Новым — <b>{TRIAL_DAYS} дня бесплатно</b> 🎁")

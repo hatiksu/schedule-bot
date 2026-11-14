@@ -200,7 +200,7 @@ async def cb_buy_theme(c: CallbackQuery):
     if not price:
         await c.answer()
         return
-    await send_invoice(c.message, f"theme:{tid}")
+    await send_invoice(c.message, f"theme:{tid}", uid=c.from_user.id)
     await c.answer()
 
 
