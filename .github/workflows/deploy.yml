@@ -1,0 +1,43 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy
+  cancel-in-progress: true
+
+jobs:
+  restart:
+    name: Перезапуск бота на хостинге
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      PANEL_URL: ${{ secrets.PANEL_URL }}
+      PANEL_API_KEY: ${{ secrets.PANEL_API_KEY }}
+      PANEL_SERVER_ID: ${{ secrets.PANEL_SERVER_ID }}
+    steps:
+      - name: Ключи панели не заданы
+        if: env.PANEL_URL == '' || env.PANEL_API_KEY == '' || env.PANEL_SERVER_ID == ''
+        run: echo "::notice::Добавьте секреты PANEL_URL, PANEL_API_KEY, PANEL_SERVER_ID (README → Автодеплой)"
+      - name: Перезапуск
+        if: env.PANEL_URL != '' && env.PANEL_API_KEY != '' && env.PANEL_SERVER_ID != ''
+        run: |
+          code=$(curl -sS -o response.txt -w '%{http_code}' -X POST \
+            "${PANEL_URL%/}/api/client/servers/${PANEL_SERVER_ID}/power" \
+            -H "Authorization: Bearer ${PANEL_API_KEY}" \
+            -H "Accept: application/json" -H "Content-Type: application/json" \
+            -d '{"signal":"restart"}')
+          if [ "$code" != "204" ]; then
+            echo "::error::Панель ответила $code"
+            cat response.txt
+            exit 1
+          fi
+          echo "Бот перезапускается и подтянет свежий код из GitHub"
